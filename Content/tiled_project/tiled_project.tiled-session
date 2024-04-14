@@ -1,0 +1,37 @@
+{
+    "Map/SizeTest": {
+        "height": 4300,
+        "width": 2
+    },
+    "activeFile": "",
+    "expandedProjectPaths": [
+    ],
+    "fileStates": {
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Sample Scene.tmx": {
+            "scale": 0.75,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 654.6666666666666,
+                "y": 1058.6666666666665
+            }
+        },
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Sample Scene2.tmx": {
+            "scale": 1,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 677,
+                "y": 446
+            }
+        }
+    },
+    "last.imagePath": "C:/Users/andre/source/repos/SnakeExtreme/Content/tilesets",
+    "map.height": 50,
+    "map.lastUsedFormat": "tmx",
+    "map.width": 50,
+    "openFiles": [
+    ],
+    "project": "tiled_project.tiled-project",
+    "recentFiles": [
+    ],
+    "tileset.lastUsedFormat": "tsx"
+}
