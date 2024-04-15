@@ -10,7 +10,11 @@
 
 #-------------------------------- References --------------------------------#
 
-/reference:..\..\..\..\.nuget\packages\monogame.extended.content.pipeline\3.8.0\tools\MonoGame.Extended.Content.Pipeline.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Content.Pipeline.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Graphics.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Tiled.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\Newtonsoft.Json.dll
 
 #---------------------------------- Content ---------------------------------#
 
@@ -37,4 +41,14 @@
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
 /build:level_0.png
+
+#begin tiled_project/level_0.tmx
+/importer:TiledMapImporter
+/processor:TiledMapProcessor
+/build:tiled_project/level_0.tmx
+
+#begin tiled_project/tileset_terrain_0.tsx
+/importer:TiledMapTilesetImporter
+/processor:TiledMapTilesetProcessor
+/build:tiled_project/tileset_terrain_0.tsx
 

@@ -13,6 +13,7 @@
   
   <PropertyGroup>
     <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -20,6 +21,27 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="MonoGame.Extended.Animations\**" />
+    <Content Remove="MonoGame.Extended.Entities\**" />
+    <Content Remove="MonoGame.Extended.Graphics\**" />
+    <Content Remove="MonoGame.Extended.Input\**" />
+    <Content Remove="MonoGame.Extended.Tiled\**" />
+    <Content Remove="MonoGame.Extended\**" />
+    <EmbeddedResource Remove="MonoGame.Extended.Animations\**" />
+    <EmbeddedResource Remove="MonoGame.Extended.Entities\**" />
+    <EmbeddedResource Remove="MonoGame.Extended.Graphics\**" />
+    <EmbeddedResource Remove="MonoGame.Extended.Input\**" />
+    <EmbeddedResource Remove="MonoGame.Extended.Tiled\**" />
+    <EmbeddedResource Remove="MonoGame.Extended\**" />
+    <None Remove="MonoGame.Extended.Animations\**" />
+    <None Remove="MonoGame.Extended.Entities\**" />
+    <None Remove="MonoGame.Extended.Graphics\**" />
+    <None Remove="MonoGame.Extended.Input\**" />
+    <None Remove="MonoGame.Extended.Tiled\**" />
+    <None Remove="MonoGame.Extended\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="Pages\Index.razor.cs" />
@@ -51,11 +73,29 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="MonoGame.Extended">
+      <HintPath>..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoGame.Extended.Content.Pipeline">
+      <HintPath>..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Content.Pipeline.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoGame.Extended.Graphics">
+      <HintPath>..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Graphics.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoGame.Extended.Tiled">
+      <HintPath>..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Tiled.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Content\tiled_project\level_0.tmx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     <None Update="Content\tiled_project\tileset_terrain_0.tsx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

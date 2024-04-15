@@ -8,9 +8,8 @@ using MonoGame.Extended.Tiled;
 using MonoGame.Extended.Tiled.Renderers;
 using System;
 using System.Collections.Generic;
-#if DEBUG
-using System.Runtime.InteropServices;
-#endif
+using System.Diagnostics;
+using System.Reflection;
 
 
 namespace SnakeExtreme
@@ -23,7 +22,7 @@ namespace SnakeExtreme
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
         Color clearColor = Color.Pink;
-        Texture2D levelTexture2D;
+        //Texture2D levelTexture2D;
         TiledMap tiledMap;
         TiledMapRenderer tiledMapRenderer;
 
@@ -52,15 +51,15 @@ namespace SnakeExtreme
         /// all of your content.
         /// </summary>
         protected override void LoadContent()
-        {
+        {           
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
 
             // TODO: Use this.Content to load your game content here
-            levelTexture2D = Content.Load<Texture2D>("level_0");
-
-            //tiledMap = Content.Load<TiledMap>("tiled_project/level_0");
-            //tiledMapRenderer = new TiledMapRenderer(graphicsDevice: GraphicsDevice, map: tiledMap);
+            //levelTexture2D = Content.Load<Texture2D>("level_0");
+            tiledMap = Content.Load<TiledMap>("tiled_project/level_0");
+            tiledMapRenderer = new TiledMapRenderer(graphicsDevice: GraphicsDevice, map: tiledMap);
+            GraphicsDevice.BlendState = BlendState.AlphaBlend;
         }
 
         /// <summary>
@@ -99,6 +98,7 @@ namespace SnakeExtreme
                 clearColor = Color.Red;
 
             // TODO: Add your update logic here
+            tiledMapRenderer.Update(gameTime);
 
             base.Update(gameTime);
         }
@@ -112,17 +112,8 @@ namespace SnakeExtreme
             GraphicsDevice.Clear(clearColor);
 
             // TODO: Add your drawing code here
-            spriteBatch.Begin();
-            spriteBatch.Draw(levelTexture2D, Vector2.Zero, Color.White);
-            spriteBatch.End();
+            tiledMapRenderer.Draw();
             base.Draw(gameTime);
         }
-
-#if DEBUG
-        // https://gamedev.stackexchange.com/questions/45107/input-output-console-window-in-xna#:~:text=Right%20click%20your%20game%20in%20the%20solution%20explorer,tab.%20Change%20the%20Output%20Type%20to%20Console%20Application.
-        // This opens a console window in the game.
-        [DllImport("kernel32")]
-        static extern bool AllocConsole();
-#endif
     }
 }
