@@ -16,14 +16,15 @@ using System.Reflection;
 using System.Reflection.Metadata;
 using Microsoft.Xna.Framework.Content;
 using MonoGame.Extended;
+using System.Collections.ObjectModel;
 
 
 namespace SnakeExtreme
 {
     public interface IObject
     {
-        public int Priority { get; }
-        public void Update(GameTime gameTime);
+        public int Priority { get; set; }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState);
         public void Draw(SpriteBatch spriteBatch);
     }
     public interface ITangible
@@ -31,6 +32,7 @@ namespace SnakeExtreme
         public Vector2 Position { get; set; }
         public Size Size { get; }
     }
+    public enum ButtonTypes { Up, Down, Left, Right }
     public class Torch : IObject, ITangible
     {        
         private readonly AnimatedSprite sprite;
@@ -38,13 +40,13 @@ namespace SnakeExtreme
         {            
             var spriteSheet = content.Load<SpriteSheet>("sprite_factory/fire_candelabrum_0.sf", new JsonContentLoader());            
             sprite = new AnimatedSprite(spriteSheet);
-            sprite.Origin = new Vector2(x: 0, y: 64) - sprite.Origin;
+            sprite.Origin = new Vector2(x: 0, y: 64);
             sprite.Play("flame_0");
         }
         public Vector2 Position { get; set; }
         public Size Size { get => new Size(width: 32, height: 32); }
-        public int Priority { get => (int)Position.Y; }
-        public void Update(GameTime gameTime)
+        public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
         {            
             sprite.Update((float)gameTime.ElapsedGameTime.TotalSeconds);
         }
@@ -52,6 +54,109 @@ namespace SnakeExtreme
         {
             spriteBatch.Begin(samplerState: SamplerState.PointClamp);
             spriteBatch.Draw(sprite: sprite, position: Position);
+            spriteBatch.End();
+        }
+    }
+    public class Button : IObject, ITangible
+    {
+        private readonly AnimatedSprite visualSprite;
+        private readonly AnimatedSprite messageSprite;
+        private readonly static ReadOnlyDictionary<ButtonTypes, string> visualAssetMap = new(new Dictionary<ButtonTypes, string>()
+        {
+            { ButtonTypes.Up, "sprite_factory/button_0.sf" },
+            { ButtonTypes.Down, "sprite_factory/button_0.sf" },
+            { ButtonTypes.Left, "sprite_factory/button_0.sf" },
+            { ButtonTypes.Right, "sprite_factory/button_0.sf" },
+        });
+        private readonly static ReadOnlyDictionary<ButtonTypes, string> messageAssetMap = new(new Dictionary<ButtonTypes, string>()
+        {
+            { ButtonTypes.Up, "sprite_factory/arrows_0.sf" },
+            { ButtonTypes.Down, "sprite_factory/arrows_0.sf" },
+            { ButtonTypes.Left, "sprite_factory/arrows_0.sf" },
+            { ButtonTypes.Right, "sprite_factory/arrows_0.sf" },
+        });
+        private readonly static ReadOnlyDictionary<ButtonTypes, string> nameMap = new(new Dictionary<ButtonTypes, string>()
+        {
+            { ButtonTypes.Up, "up_0" },
+            { ButtonTypes.Down, "down_0" },
+            { ButtonTypes.Left, "left_0" },
+            { ButtonTypes.Right, "right_0" },
+        });
+        private readonly static ReadOnlyDictionary<ButtonTypes, Keys> keyMap = new(new Dictionary<ButtonTypes, Keys>()
+        {
+            { ButtonTypes.Up, Keys.Up },
+            { ButtonTypes.Down, Keys.Down },
+            { ButtonTypes.Left, Keys.Left },
+            { ButtonTypes.Right, Keys.Right },
+        });
+        public Button(ContentManager content, ButtonTypes buttonType)
+        {
+            ButtonType = buttonType;
+            {
+                var spriteSheet = content.Load<SpriteSheet>(visualAssetMap[buttonType], new JsonContentLoader());
+                visualSprite = new AnimatedSprite(spriteSheet);
+                visualSprite.Origin = Vector2.Zero;
+                visualSprite.Play("unselected_0");
+                Size = (Size)spriteSheet.TextureAtlas[0].Size;
+            }
+            {
+                var spriteSheet = content.Load<SpriteSheet>(messageAssetMap[buttonType], new JsonContentLoader());
+                messageSprite = new AnimatedSprite(spriteSheet);
+                messageSprite.Origin = Vector2.Zero;
+                messageSprite.Play(nameMap[buttonType]);
+            }
+            Console.WriteLine($"Origin: {visualSprite.Origin}");
+        }
+        public ButtonTypes ButtonType { get; }
+        public bool Selected { get; private set; } = false;
+        public bool Pressed { get; private set; } = false;
+        public bool Released { get; private set; } = false;
+        public Vector2 Position { get; set; }
+        public Size Size { get; }
+        public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {
+            float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            if (!Selected && ((
+                mouseState.LeftButton == ButtonState.Pressed && 
+                mouseState.Position.X >= Position.X && mouseState.X < (Position.X + Size.Width) &&
+                mouseState.Position.Y >= Position.Y && mouseState.Y < (Position.Y + Size.Height)) || (
+                keyboardState.IsKeyDown(keyMap[ButtonType]))))
+            {
+                visualSprite.Play("selected_0");
+                Selected = true;
+                Pressed = true;
+            }
+            else
+            {
+                Pressed = false;
+            }
+
+            if (Selected && ((
+                mouseState.LeftButton != ButtonState.Pressed) && 
+                keyboardState.IsKeyUp(keyMap[ButtonType])))
+            {
+                visualSprite.Play("unselected_0");
+                Selected = false;
+                Released = true;
+            }
+            else
+            {
+                Released = false;
+            }
+
+
+            visualSprite.Update(deltaTime);
+            messageSprite.Update(deltaTime);
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            spriteBatch.Draw(sprite: visualSprite, position: Position);
+            spriteBatch.End();
+            spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            spriteBatch.Draw(sprite: messageSprite, position: Position);
             spriteBatch.End();
         }
     }
@@ -100,20 +205,53 @@ namespace SnakeExtreme
             // TODO: Use this.Content to load your game content here
             tiledMap = Content.Load<TiledMap>("tiled_project/level_0");
             tiledMapRenderer = new TiledMapRenderer(graphicsDevice: GraphicsDevice, map: tiledMap);
-            var mask0Layer = tiledMap.TileLayers.Where(x => x.Name == "mask_0").First();
+            var mask0Layer = tiledMap.TileLayers.Where(x => x.Name == "mask_0").First();            
             gameObjects = new();
             for (int x = 0; x < tiledMap.Width; x++)
             {
                 for (int y = 0; y < tiledMap.Height; y++)
                 {
-                    var tile = mask0Layer.GetTile((ushort)x, (ushort)y);                    
+                    var tile = mask0Layer.GetTile((ushort)x, (ushort)y);
+                    var position = new Vector2(x * tiledMap.TileWidth, y * tiledMap.TileHeight);
                     if (tile.GlobalIdentifier == 4098)
                     {
                         var torch = new Torch(Content)
                         {
-                            Position = new Vector2(x: x * tiledMap.TileWidth, y: y * tiledMap.TileHeight)
+                            Position = position
                         };
                         gameObjects.Add(torch);
+                    } 
+                    else if (tile.GlobalIdentifier == 4099)
+                    {
+                        var up = new Button(Content, ButtonTypes.Up)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(up);
+                    }
+                    else if (tile.GlobalIdentifier == 4100)
+                    {
+                        var down = new Button(Content, ButtonTypes.Down)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(down);
+                    }
+                    else if (tile.GlobalIdentifier == 4102)
+                    {
+                        var left = new Button(Content, ButtonTypes.Left)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(left);
+                    }
+                    else if (tile.GlobalIdentifier == 4101)
+                    {
+                        var right = new Button(Content, ButtonTypes.Right)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(right);
                     }
                 }
             }
@@ -162,7 +300,7 @@ namespace SnakeExtreme
             // TODO: Add your update logic here
             tiledMapRenderer.Update(gameTime);
             foreach (var gameObject in gameObjects)
-                gameObject.Update(gameTime);
+                gameObject.Update(gameTime, mouseState, keyboardState);            
             base.Update(gameTime);
         }
 
