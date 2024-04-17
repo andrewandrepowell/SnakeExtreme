@@ -1,0 +1,14 @@
+{
+  "textureAtlas": {
+    "texture": "power_balls_4.png",
+    "regionWidth": 96,
+    "regionHeight": 96
+  },
+  "cycles": {
+    "glow_0": {
+      "frames": [0,1,2,3,4,5,6,7],
+      "isLooping": true,
+      "frameDuration": 0.2
+    }
+  }
+}

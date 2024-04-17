@@ -91,6 +91,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Content\sprite_factory\fire_candelabrum_0.sf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Content\tiled_project\level_0.tmx">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
