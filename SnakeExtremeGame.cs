@@ -25,6 +25,7 @@ namespace SnakeExtreme
     {
         public int Priority { get; set; }
         public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState);
+        public void StrictUpdate();
         public void Draw(SpriteBatch spriteBatch);
     }
     public interface ITangible
@@ -33,8 +34,222 @@ namespace SnakeExtreme
         public Size Size { get; }
     }
     public enum ButtonTypes { Up, Down, Left, Right, Pause, Start }
+    public enum BallStates { Normal, QuickVanish, QuickAppear, LongVanish, LongAppear, Invisible }
+    public class Ball : IObject, ITangible
+    {
+        private readonly AnimatedSprite ballSprite;
+        private readonly AnimatedSprite shadowSprite;
+        private readonly Effect silhouetteEffect;
+        private readonly EffectParameter overlayColorSilhouetteEffectParameter;
+        private readonly static Size size = new Size(32, 32);
+        private readonly static Vector2 drawOffset = new Vector2(-16, -16);
+        private readonly static Vector2 minBallShadowOffset = new Vector2(0, -8);
+        private Vector2 truePosition;
+        private Vector2 ballDrawPosition;
+        private Vector2 shadowDrawPosition;
+        private float floatHeight = 0;
+        private const float floatMaxHeight = 16;
+        private const float floatDeltaHeight = 0.5f;
+        private bool floatUpDirection = true;
+        private int waitCount;
+        private int waitTotal = 1;
+        private float shadowScale = 1.0f;
+        private float ballScale = 1.0f;
+        private float ballAlpha = 1.0f;
+        private float silhouetteAlpha = 0.0f;
+        private float ballHeight = 0f;
+        private const float ballMaxHeight = 32;
+        private void updateDrawPositions()
+        {
+            ballDrawPosition = truePosition + drawOffset + minBallShadowOffset + new Vector2(0, -(floatHeight + ballHeight));
+            shadowDrawPosition = truePosition + drawOffset;
+        }
+        public Ball(ContentManager content, int id)
+        {
+            Trace.Assert(id >= 0 && id <= 4);
+            ID = id;
+            {
+                var spriteSheet = content.Load<SpriteSheet>($"sprite_factory/power_balls_{1 + id}.sf", new JsonContentLoader());
+                ballSprite = new AnimatedSprite(spriteSheet);
+                ballSprite.Origin = new Vector2(48, 48);
+                ballSprite.Play("glow_0");
+            }
+            {
+                var spriteSheet = content.Load<SpriteSheet>($"sprite_factory/shadow_0.sf", new JsonContentLoader());
+                shadowSprite = new AnimatedSprite(spriteSheet);
+                shadowSprite.Origin = new Vector2(16, 16);
+                shadowSprite.Alpha = 0.5f;
+                shadowSprite.Play("shadow_0");
+            }
+            {
+                silhouetteEffect = content.Load<Effect>("effects/silhouette_0");
+                overlayColorSilhouetteEffectParameter = silhouetteEffect.Parameters["OverlayColor"];
+                overlayColorSilhouetteEffectParameter.SetValue(Color.Black.ToVector4());
+            }
+        }
+        public BallStates BallState { get; private set; } = BallStates.Normal;
+        public void QuickVanish()
+        {
+            BallState = BallStates.QuickVanish;
+            waitCount = 7;
+            waitTotal = 8;
+            shadowScale = 1;
+            ballScale = 1;
+            ballAlpha = 1;
+            silhouetteAlpha = 0;
+            ballHeight = 0;
+        }
+        public void QuickAppear()
+        {
+            BallState = BallStates.QuickAppear;
+            waitCount = 7;
+            waitTotal = 8;
+            shadowScale = 0;
+            ballScale = 0;
+            ballAlpha = 1;
+            silhouetteAlpha = 0;
+            ballHeight = 0;
+        }
+        public void LongVanish()
+        {
+            BallState = BallStates.LongVanish;
+            waitCount = 15;
+            waitTotal = 16;
+            shadowScale = 1;
+            ballScale = 1;
+            ballAlpha = 1;
+            silhouetteAlpha = 0;
+            ballHeight = 0;
+        }
+        public void LongAppear()
+        {
+            BallState = BallStates.LongAppear;
+            waitCount = 15;
+            waitTotal = 16;
+            shadowScale = 0;
+            ballScale = 1;
+            ballAlpha = 0;
+            silhouetteAlpha = 1;
+            ballHeight = ballMaxHeight;
+        }
+        public int ID { get; }        
+        public Vector2 Position 
+        {
+            get => truePosition;
+            set
+            {
+                truePosition = value;
+                updateDrawPositions();
+            }
+        }
+        public Size Size { get => size; }
+        public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {            
+            float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;                
+            ballSprite.Update(deltaTime);
+            shadowSprite.Update(deltaTime);            
+        }
+        public void StrictUpdate()
+        {
+            // Update properties affected by state.
+            float waitRatio = (float)waitCount / waitTotal;
+
+            if ((BallState == BallStates.QuickVanish || BallState == BallStates.LongVanish))
+                shadowScale = MathHelper.Lerp(0, 1, waitRatio);
+            else if ((BallState == BallStates.QuickAppear || BallState == BallStates.LongAppear))
+                shadowScale = MathHelper.Lerp(1, 0, waitRatio);
+            else
+                shadowScale = 1;
+
+            if (BallState == BallStates.QuickVanish)
+                ballScale = MathHelper.Lerp(0, 1, waitRatio);
+            else if (BallState == BallStates.QuickAppear)
+                ballScale = MathHelper.Lerp(1, 0, waitRatio);
+            else
+                ballScale = 1.0f;
+
+            if (BallState == BallStates.LongVanish)
+                ballAlpha = MathHelper.Lerp(0, 1, waitRatio);
+            else if (BallState == BallStates.LongAppear)
+                ballAlpha = MathHelper.Lerp(1, 0, waitRatio);
+            else 
+                ballAlpha = 1f;
+
+            if (BallState == BallStates.LongVanish)
+                silhouetteAlpha = MathHelper.Lerp(1, 0, waitRatio);
+            else if (BallState == BallStates.LongAppear)
+                silhouetteAlpha = MathHelper.Lerp(0, 1, waitRatio);
+            else
+                silhouetteAlpha = 0f;
+
+            if (BallState == BallStates.LongVanish)
+                ballHeight = MathHelper.Lerp(ballMaxHeight, 0, waitRatio);
+            else if (BallState == BallStates.LongAppear)
+                ballHeight = MathHelper.Lerp(0, ballMaxHeight, waitRatio);
+            else
+                ballHeight = 0;
+
+            // Update Counters
+            if (waitCount > 0)
+                waitCount--;
+
+            // Update FSM states.
+            if ((BallState == BallStates.QuickVanish || BallState == BallStates.LongVanish) && waitCount == 0)
+                BallState = BallStates.Invisible;
+
+            if ((BallState == BallStates.QuickAppear || BallState == BallStates.LongAppear) && waitCount == 0)
+                BallState = BallStates.Normal;
+
+            // Update float height
+            {                
+                if (floatUpDirection)
+                {
+                    floatHeight += floatDeltaHeight;
+                    if (floatHeight >= floatMaxHeight)
+                    {
+                        floatHeight = floatMaxHeight;
+                        floatUpDirection = false;
+                    }
+                }
+                else
+                {
+                    floatHeight -= floatDeltaHeight;
+                    if (floatHeight <= 0)
+                    {
+                        floatHeight = 0;
+                        floatUpDirection = true;
+                    }
+                }                
+            }
+
+            // Since float height changes every strict update
+            // need to always update draw positions.
+            updateDrawPositions();
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            if (BallState != BallStates.Invisible)
+            {
+                spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+                spriteBatch.Draw(sprite: shadowSprite, position: shadowDrawPosition, rotation: 0, scale: new Vector2(shadowScale));
+                spriteBatch.End();
+
+                ballSprite.Alpha = ballAlpha;
+                spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+                spriteBatch.Draw(sprite: ballSprite, position: ballDrawPosition, rotation: 0, scale: new Vector2(ballScale));
+                spriteBatch.End();
+
+                ballSprite.Alpha = ballAlpha * silhouetteAlpha;
+                spriteBatch.Begin(samplerState: SamplerState.PointClamp, effect: silhouetteEffect);
+                spriteBatch.Draw(sprite: ballSprite, position: ballDrawPosition, rotation: 0, scale: new Vector2(ballScale));
+                spriteBatch.End();
+            }
+        }
+    }
     public class Torch : IObject, ITangible
     {        
+        private readonly static Size size = new Size(width: 32, height: 32);
         private readonly AnimatedSprite sprite;
         public Torch(ContentManager content)
         {            
@@ -44,11 +259,14 @@ namespace SnakeExtreme
             sprite.Play("flame_0");
         }
         public Vector2 Position { get; set; }
-        public Size Size { get => new Size(width: 32, height: 32); }
+        public Size Size { get => size; }
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
         public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
         {            
             sprite.Update((float)gameTime.ElapsedGameTime.TotalSeconds);
+        }
+        public void StrictUpdate()
+        {
         }
         public void Draw(SpriteBatch spriteBatch)
         {
@@ -112,8 +330,7 @@ namespace SnakeExtreme
                 messageSprite = new AnimatedSprite(spriteSheet);
                 messageSprite.Origin = Vector2.Zero;
                 messageSprite.Play(nameMap[buttonType]);
-            }
-            Console.WriteLine($"Origin: {visualSprite.Origin}");
+            }            
         }
         public ButtonTypes ButtonType { get; }
         public bool Selected { get; private set; } = false;
@@ -158,6 +375,10 @@ namespace SnakeExtreme
                 messageSprite.Update(deltaTime);
             }
         }
+        public void StrictUpdate()
+        {
+
+        }
         public void Draw(SpriteBatch spriteBatch)
         {
             spriteBatch.Begin(samplerState: SamplerState.PointClamp);
@@ -173,12 +394,15 @@ namespace SnakeExtreme
     /// </summary>
     public class SnakeExtremeGame : Game
     {
-        GraphicsDeviceManager graphics;
-        SpriteBatch spriteBatch;
-        TiledMap levelTiledMap;
-        TiledMapRenderer levelTiledMapRenderer;
-        List<IObject> gameObjects;
-        Button upButton, downButton, leftButton, rightButton, startButton, pauseButton;
+        private GraphicsDeviceManager graphics;
+        private SpriteBatch spriteBatch;
+        private TiledMap levelTiledMap;
+        private TiledMapRenderer levelTiledMapRenderer;
+        private List<IObject> gameObjects;
+        private Button upButton, downButton, leftButton, rightButton, startButton, pauseButton;
+        private float strictTimePassed;
+        private const float strictTimeAmount = (float)1 / 30;
+        private Ball test;
 
         public SnakeExtremeGame()
         {
@@ -279,7 +503,8 @@ namespace SnakeExtreme
                 }
             }
 
-
+            test = new Ball(Content, 2) { Position = new Vector2(32 * 6, 32 * 6) };
+            gameObjects.Add(test);
             //Console.WriteLine($"CWD: {System.AppDomain.CurrentDomain.BaseDirectory}");
             //spriteSheet = Content.Load<SpriteSheet>("sprite_factory/fire_candelabrum_0.sf", new JsonContentLoader());
             //sprite = new AnimatedSprite(spriteSheet);
@@ -323,7 +548,25 @@ namespace SnakeExtreme
             // TODO: Add your update logic here
             levelTiledMapRenderer.Update(gameTime);
             foreach (var gameObject in gameObjects)
-                gameObject.Update(gameTime, mouseState, keyboardState);            
+                gameObject.Update(gameTime, mouseState, keyboardState);
+
+            if (test.BallState == BallStates.Normal)
+                test.LongVanish();
+            if (test.BallState == BallStates.Invisible)
+                test.QuickAppear();
+
+            {
+                float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+                strictTimePassed += deltaTime;
+                for (; strictTimePassed >= strictTimeAmount; strictTimePassed -= strictTimeAmount)
+                {
+                    foreach (var gameObject in gameObjects)
+                        gameObject.StrictUpdate();
+                }
+            }
+
+
+
             base.Update(gameTime);
         }
 

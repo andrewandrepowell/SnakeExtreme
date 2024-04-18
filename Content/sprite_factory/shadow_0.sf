@@ -1,0 +1,14 @@
+{
+  "textureAtlas": {
+    "texture": "shadow_0.png",
+    "regionWidth": 32,
+    "regionHeight": 32
+  },
+  "cycles": {
+    "shadow_0": {
+      "frames": [0,1,2,3,4,5],
+      "isLooping": true,
+      "frameDuration": 0.4
+    }
+  }
+}

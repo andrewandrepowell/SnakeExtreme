@@ -1,12 +1,12 @@
 {
   "textureAtlas": {
-    "texture": "powell_balls_2.png",
+    "texture": "power_balls_5.png",
     "regionWidth": 96,
     "regionHeight": 96
   },
   "cycles": {
     "glow_0": {
-      "frames": [0,1,2,3,4,5],
+      "frames": [0,1,2,3,4,5,6,7],
       "isLooping": true,
       "frameDuration": 0.2
     }
