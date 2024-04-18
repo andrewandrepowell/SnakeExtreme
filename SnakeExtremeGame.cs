@@ -32,7 +32,7 @@ namespace SnakeExtreme
         public Vector2 Position { get; set; }
         public Size Size { get; }
     }
-    public enum ButtonTypes { Up, Down, Left, Right }
+    public enum ButtonTypes { Up, Down, Left, Right, Pause, Start }
     public class Torch : IObject, ITangible
     {        
         private readonly AnimatedSprite sprite;
@@ -67,6 +67,8 @@ namespace SnakeExtreme
             { ButtonTypes.Down, "sprite_factory/button_0.sf" },
             { ButtonTypes.Left, "sprite_factory/button_0.sf" },
             { ButtonTypes.Right, "sprite_factory/button_0.sf" },
+            { ButtonTypes.Pause, "sprite_factory/button_1.sf" },
+            { ButtonTypes.Start, "sprite_factory/button_1.sf" },
         });
         private readonly static ReadOnlyDictionary<ButtonTypes, string> messageAssetMap = new(new Dictionary<ButtonTypes, string>()
         {
@@ -74,6 +76,8 @@ namespace SnakeExtreme
             { ButtonTypes.Down, "sprite_factory/arrows_0.sf" },
             { ButtonTypes.Left, "sprite_factory/arrows_0.sf" },
             { ButtonTypes.Right, "sprite_factory/arrows_0.sf" },
+            { ButtonTypes.Pause, "sprite_factory/texts_0.sf" },
+            { ButtonTypes.Start, "sprite_factory/texts_0.sf" },
         });
         private readonly static ReadOnlyDictionary<ButtonTypes, string> nameMap = new(new Dictionary<ButtonTypes, string>()
         {
@@ -81,6 +85,8 @@ namespace SnakeExtreme
             { ButtonTypes.Down, "down_0" },
             { ButtonTypes.Left, "left_0" },
             { ButtonTypes.Right, "right_0" },
+            { ButtonTypes.Pause, "pause_0" },
+            { ButtonTypes.Start, "start_0" },
         });
         private readonly static ReadOnlyDictionary<ButtonTypes, Keys> keyMap = new(new Dictionary<ButtonTypes, Keys>()
         {
@@ -88,6 +94,8 @@ namespace SnakeExtreme
             { ButtonTypes.Down, Keys.Down },
             { ButtonTypes.Left, Keys.Left },
             { ButtonTypes.Right, Keys.Right },
+            { ButtonTypes.Pause, Keys.Escape },
+            { ButtonTypes.Start, Keys.Enter },
         });
         public Button(ContentManager content, ButtonTypes buttonType)
         {
@@ -115,9 +123,7 @@ namespace SnakeExtreme
         public Size Size { get; }
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
         public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
-        {
-            float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-
+        {            
             if (!Selected && ((
                 mouseState.LeftButton == ButtonState.Pressed && 
                 mouseState.Position.X >= Position.X && mouseState.X < (Position.X + Size.Width) &&
@@ -146,9 +152,11 @@ namespace SnakeExtreme
                 Released = false;
             }
 
-
-            visualSprite.Update(deltaTime);
-            messageSprite.Update(deltaTime);
+            {
+                float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+                visualSprite.Update(deltaTime);
+                messageSprite.Update(deltaTime);
+            }
         }
         public void Draw(SpriteBatch spriteBatch)
         {
@@ -167,11 +175,10 @@ namespace SnakeExtreme
     {
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
-        TiledMap tiledMap;
-        TiledMapRenderer tiledMapRenderer;
+        TiledMap levelTiledMap;
+        TiledMapRenderer levelTiledMapRenderer;
         List<IObject> gameObjects;
-        SpriteSheet spriteSheet;
-        AnimatedSprite sprite;
+        Button upButton, downButton, leftButton, rightButton, startButton, pauseButton;
 
         public SnakeExtremeGame()
         {
@@ -203,16 +210,16 @@ namespace SnakeExtreme
             spriteBatch = new SpriteBatch(GraphicsDevice);
 
             // TODO: Use this.Content to load your game content here
-            tiledMap = Content.Load<TiledMap>("tiled_project/level_0");
-            tiledMapRenderer = new TiledMapRenderer(graphicsDevice: GraphicsDevice, map: tiledMap);
-            var mask0Layer = tiledMap.TileLayers.Where(x => x.Name == "mask_0").First();            
+            levelTiledMap = Content.Load<TiledMap>("tiled_project/level_0");
+            levelTiledMapRenderer = new TiledMapRenderer(graphicsDevice: GraphicsDevice, map: levelTiledMap);
+            var maskLayer = levelTiledMap.TileLayers.Where(x => x.Name == "mask_0").First();            
             gameObjects = new();
-            for (int x = 0; x < tiledMap.Width; x++)
+            for (int x = 0; x < levelTiledMap.Width; x++)
             {
-                for (int y = 0; y < tiledMap.Height; y++)
+                for (int y = 0; y < levelTiledMap.Height; y++)
                 {
-                    var tile = mask0Layer.GetTile((ushort)x, (ushort)y);
-                    var position = new Vector2(x * tiledMap.TileWidth, y * tiledMap.TileHeight);
+                    var tile = maskLayer.GetTile((ushort)x, (ushort)y);
+                    var position = new Vector2(x * levelTiledMap.TileWidth, y * levelTiledMap.TileHeight);
                     if (tile.GlobalIdentifier == 4098)
                     {
                         var torch = new Torch(Content)
@@ -223,35 +230,51 @@ namespace SnakeExtreme
                     } 
                     else if (tile.GlobalIdentifier == 4099)
                     {
-                        var up = new Button(Content, ButtonTypes.Up)
+                        upButton = new Button(Content, ButtonTypes.Up)
                         {
                             Position = position
                         };
-                        gameObjects.Add(up);
+                        gameObjects.Add(upButton);
                     }
                     else if (tile.GlobalIdentifier == 4100)
                     {
-                        var down = new Button(Content, ButtonTypes.Down)
+                        downButton = new Button(Content, ButtonTypes.Down)
                         {
                             Position = position
                         };
-                        gameObjects.Add(down);
-                    }
-                    else if (tile.GlobalIdentifier == 4102)
-                    {
-                        var left = new Button(Content, ButtonTypes.Left)
-                        {
-                            Position = position
-                        };
-                        gameObjects.Add(left);
+                        gameObjects.Add(downButton);
                     }
                     else if (tile.GlobalIdentifier == 4101)
                     {
-                        var right = new Button(Content, ButtonTypes.Right)
+                        rightButton = new Button(Content, ButtonTypes.Right)
                         {
                             Position = position
                         };
-                        gameObjects.Add(right);
+                        gameObjects.Add(rightButton);
+                    }
+                    else if (tile.GlobalIdentifier == 4102)
+                    {
+                        leftButton = new Button(Content, ButtonTypes.Left)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(leftButton);
+                    }
+                    else if (tile.GlobalIdentifier == 4103)
+                    {
+                        startButton = new Button(Content, ButtonTypes.Start)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(startButton);
+                    }
+                    else if (tile.GlobalIdentifier == 4104)
+                    {
+                        pauseButton = new Button(Content, ButtonTypes.Pause)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(pauseButton);
                     }
                 }
             }
@@ -298,7 +321,7 @@ namespace SnakeExtreme
             //}
 
             // TODO: Add your update logic here
-            tiledMapRenderer.Update(gameTime);
+            levelTiledMapRenderer.Update(gameTime);
             foreach (var gameObject in gameObjects)
                 gameObject.Update(gameTime, mouseState, keyboardState);            
             base.Update(gameTime);
@@ -314,7 +337,7 @@ namespace SnakeExtreme
 
             // TODO: Add your drawing code here
             GraphicsDevice.BlendState = BlendState.AlphaBlend;
-            tiledMapRenderer.Draw();
+            levelTiledMapRenderer.Draw();
             foreach (var gameObject in gameObjects.OrderBy(x => x.Priority))
                 gameObject.Draw(spriteBatch);
             base.Draw(gameTime);
