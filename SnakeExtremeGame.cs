@@ -37,6 +37,66 @@ namespace SnakeExtreme
     {
         public Point LevelPosition { get; set; }
     }
+    public class Food : IObject, ITangible, ILevelObject
+    {
+        private readonly Ball ball;
+        private Point trueLevelPosition;
+        public Food(ContentManager content)
+        {
+            ball = new Ball(content, 4);
+            ball.LongAppear();
+            State = States.Appear;
+        }
+        public enum States { Appear, Normal, Vanish, Gone }
+        public States State { get; private set; }
+        public void Vanish()
+        {
+            Debug.Assert(State == States.Normal);
+            ball.LongVanish();
+            State = States.Vanish;
+        }
+        public Vector2 Position
+        {
+            get => ball.Position;
+            set => throw new NotImplementedException();
+        }
+        public Size Size
+        {
+            get => ball.Size;
+        }
+        public int Priority
+        {
+            get => ball.Priority;
+            set => throw new NotImplementedException();
+        }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {
+            if (State == States.Appear && ball.State == Ball.States.Normal)            
+                State = States.Normal;
+
+            if (State == States.Vanish && ball.State == Ball.States.Invisible)
+                State = States.Gone;
+
+            ball.Update(gameTime, mouseState, keyboardState);
+        }
+        public void StrictUpdate()
+        {
+            ball.StrictUpdate();
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            ball.Draw(spriteBatch);
+        }
+        public Point LevelPosition
+        {
+            get => trueLevelPosition;
+            set
+            {
+                trueLevelPosition = value;
+                ball.Position = new Vector2(trueLevelPosition.X * Size.Width, trueLevelPosition.Y * Size.Height);
+            }
+        }
+    }
     public class Snake : IObject, ITangible, ILevelObject
     {
         private readonly List<SnakeBody> bodies = new();
@@ -220,7 +280,7 @@ namespace SnakeExtreme
         private readonly Effect silhouetteEffect;
         private readonly EffectParameter overlayColorSilhouetteEffectParameter;
         private readonly static Size size = new Size(32, 32);
-        private readonly static Vector2 drawOffset = new Vector2(-16, -16);
+        private readonly static Vector2 drawOffset = new Vector2(16, 16);
         private readonly static Vector2 minBallShadowOffset = new Vector2(0, -8);
         private Vector2 truePosition;
         private Vector2 ballDrawPosition;
@@ -361,6 +421,8 @@ namespace SnakeExtreme
         {
             // Update properties affected by state.
             float waitRatio = (float)waitCount / waitTotal;
+            float waitHighRatio = MathHelper.Clamp(2 * waitRatio - 1, 0, 1);
+            float waitLowRatio = MathHelper.Clamp(2 * waitRatio, 0, 1);
 
             if ((State == States.QuickVanish || State == States.LongVanish))
                 shadowScale = MathHelper.Lerp(0, 1, waitRatio);
@@ -384,9 +446,9 @@ namespace SnakeExtreme
                 ballAlpha = 1f;
 
             if (State == States.LongVanish)
-                silhouetteAlpha = MathHelper.Lerp(1, 0, waitRatio);
+                silhouetteAlpha = MathHelper.Lerp(1, 0, waitHighRatio);
             else if (State == States.LongAppear)
-                silhouetteAlpha = MathHelper.Lerp(0, 1, waitRatio);
+                silhouetteAlpha = MathHelper.Lerp(0, 1, waitLowRatio);
             else
                 silhouetteAlpha = 0f;
 
@@ -599,6 +661,7 @@ namespace SnakeExtreme
     /// </summary>
     public class SnakeExtremeGame : Game
     {
+        private readonly static Random random = new Random();
         private GraphicsDeviceManager graphics;
         private SpriteBatch spriteBatch;
         private TiledMap levelTiledMap;
@@ -608,14 +671,25 @@ namespace SnakeExtreme
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;
         private Snake snake;
+        private Food food, newFood;
         private int waitCount;
         private bool growTail = false;
-
+        private List<Point> levelCorners;
+        private List<Point> levelPossiblePositions;
+        private Point getRandomLevelPosition()
+        {
+            var availablePositions = levelPossiblePositions.Except(gameObjects.OfType<ILevelObject>().Select(x => x.LevelPosition)).ToList();
+            return availablePositions[random.Next(availablePositions.Count)];
+        }
         public SnakeExtremeGame()
         {
             graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
         }
+        public enum FoodStates { Normal, NewFood }
+        public enum GameStates { Start, Create, Wait, Action, Destroy }
+        public GameStates GameState { get; private set; } = GameStates.Start;
+        public FoodStates FoodState { get; private set; } = FoodStates.Normal;
 
         /// <summary>
         /// Allows the game to perform any initialization it needs to before starting to run.
@@ -628,7 +702,6 @@ namespace SnakeExtreme
             // TODO: Add your initialization logic here
 
             base.Initialize();
-
         }
 
         /// <summary>
@@ -642,16 +715,21 @@ namespace SnakeExtreme
 
             // TODO: Use this.Content to load your game content here
             levelTiledMap = Content.Load<TiledMap>("tiled_project/level_0");
-            levelTiledMapRenderer = new TiledMapRenderer(graphicsDevice: GraphicsDevice, map: levelTiledMap);
+            levelTiledMapRenderer = new TiledMapRenderer(GraphicsDevice, levelTiledMap);
             var maskLayer = levelTiledMap.TileLayers.Where(x => x.Name == "mask_0").First();            
             gameObjects = new();
+            levelCorners = new();            
             for (int x = 0; x < levelTiledMap.Width; x++)
             {
                 for (int y = 0; y < levelTiledMap.Height; y++)
                 {
                     var tile = maskLayer.GetTile((ushort)x, (ushort)y);
                     var position = new Vector2(x * levelTiledMap.TileWidth, y * levelTiledMap.TileHeight);
-                    if (tile.GlobalIdentifier == 4098)
+                    if (tile.GlobalIdentifier == 4097)
+                    {
+                        levelCorners.Add(new Point(x, y));
+                    }
+                    else if (tile.GlobalIdentifier == 4098)
                     {
                         var torch = new Torch(Content)
                         {
@@ -710,6 +788,23 @@ namespace SnakeExtreme
                 }
             }
 
+            Debug.Assert(upButton != null);
+            Debug.Assert(downButton != null);
+            Debug.Assert(leftButton != null);
+            Debug.Assert(rightButton != null);
+            Debug.Assert(levelCorners.Count == 2);
+
+            {
+                levelPossiblePositions = new();
+                var minX = levelCorners.Select(x => x.X).Min();
+                var maxX = levelCorners.Select(x => x.X).Max();
+                var minY = levelCorners.Select(x => x.Y).Min();
+                var maxY = levelCorners.Select(x => x.Y).Max();
+                for (int x = minX; x <= maxX; x++)                
+                    for (int y = minY; y <= maxY; y++)                    
+                        levelPossiblePositions.Add(new Point(x, y));                                    
+            }
+
             snake = new Snake(Content);
             gameObjects.Add(snake);
             //Console.WriteLine($"CWD: {System.AppDomain.CurrentDomain.BaseDirectory}");
@@ -744,21 +839,7 @@ namespace SnakeExtreme
             try { gamePadState = GamePad.GetState(PlayerIndex.One); }
             catch (NotImplementedException) { /* ignore gamePadState */ }
 
-            //if (keyboardState.IsKeyDown(Keys.Escape) ||
-            //    keyboardState.IsKeyDown(Keys.Back) ||
-            //    gamePadState.Buttons.Back == ButtonState.Pressed)
-            //{
-            //    try { Exit(); }
-            //    catch (PlatformNotSupportedException) { /* ignore */ }
-            //}
-
             // TODO: Add your update logic here
-
-
-            levelTiledMapRenderer.Update(gameTime);
-            foreach (var gameObject in gameObjects)
-                gameObject.Update(gameTime, mouseState, keyboardState);
-
             if (upButton.Pressed)
                 snake.Direction = Snake.Directions.Up;
             if (downButton.Pressed)
@@ -767,38 +848,109 @@ namespace SnakeExtreme
                 snake.Direction = Snake.Directions.Left;
             if (rightButton.Pressed)
                 snake.Direction = Snake.Directions.Right;
+
             if (startButton.Pressed)
             {
-                if (snake.Headless)
+                if (GameState == GameStates.Start)
                 {
-                    snake.CreateHead(new Point(10, 10));                    
+                    Debug.Assert(snake.Headless);
+                    Debug.Assert(food == null);
+
+                    var startLevelPosition = new Point(
+                        (int)levelCorners.Select(x => x.X).Average(),
+                        (int)levelCorners.Select(x => x.Y).Average());
+                    snake.CreateHead(startLevelPosition);
                     gameObjects.Add(snake.Head);
-                }
-                else if (snake.State == Snake.States.Normal)
-                {
-                    snake.Vanish();
+
+                    food = new Food(Content) { LevelPosition = getRandomLevelPosition() };
+                    gameObjects.Add(food);
+                    GameState = GameStates.Create;
                 }
             }
-            if (snake.State == Snake.States.Gone)
+
+            if (GameState == GameStates.Create && snake.State == Snake.States.Normal && food.State == Food.States.Normal)
+            {
+                waitCount = 15;
+                GameState = GameStates.Wait;
+            }
+
+            if (GameState == GameStates.Wait && waitCount == 0)
+            {
+                var snakeNextLevelPosition = snake.LevelPosition + Snake.DirectionPoints[snake.Direction];
+
+                var minX = levelCorners.Select(x => x.X).Min();
+                var maxX = levelCorners.Select(x => x.X).Max();
+                var minY = levelCorners.Select(x => x.Y).Min();
+                var maxY = levelCorners.Select(x => x.Y).Max();               
+
+                if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
+                    snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY ||
+                    snake.Bodies.Any(x=> x.LevelPosition == snakeNextLevelPosition && x != snake.Tail))
+                {
+                    snake.Vanish();
+                    food.Vanish();
+                    GameState = GameStates.Destroy;
+                }
+                else if (snakeNextLevelPosition == food.LevelPosition)
+                {
+                    Debug.Assert(newFood == null);
+                    snake.Move(growTail: true);
+                    food.Vanish();
+                    newFood = new Food(Content) { LevelPosition = getRandomLevelPosition() };
+                    gameObjects.Add(newFood);
+                    FoodState = FoodStates.NewFood;
+                    GameState = GameStates.Action;
+                }
+                else
+                {
+                    snake.Move(growTail: false);
+                    FoodState = FoodStates.Normal;
+                    GameState = GameStates.Action;
+                }                
+            }
+
+            if (GameState == GameStates.Action && snake.State == Snake.States.Normal)
+            {
+                if (FoodState == FoodStates.NewFood && food.State == Food.States.Gone && newFood.State == Food.States.Normal)
+                {
+                    gameObjects.Remove(food);
+                    food = newFood;
+                    newFood = null;
+                    waitCount = 15;
+                    GameState = GameStates.Wait;
+                }
+                else if (FoodState == FoodStates.Normal)
+                {
+                    Debug.Assert(food.State == Food.States.Normal);
+                    Debug.Assert(newFood == null);
+                    waitCount = 15;
+                    GameState = GameStates.Wait;
+                }
+            }
+
+            if (GameState == GameStates.Destroy && snake.State == Snake.States.Gone && food.State == Food.States.Gone)
             {
                 foreach (var body in snake.Bodies)
                     gameObjects.Remove(body);
                 snake.Clear();
+
+                gameObjects.Remove(food);
+                food = null;
+
+                GameState = GameStates.Start;
             }
-            if (pauseButton.Pressed && !snake.Headless)
-            {
-                growTail = true;
-            }
-            if (waitCount == 0 && !snake.Headless && snake.State == Snake.States.Normal)
-            {
-                waitCount = 30;
-                snake.Move(growTail);
-                growTail = false;
-            }
+
             if (snake.NewTailAvailable)
                 gameObjects.Add(snake.Tail);
 
+            // Perform level and game object updates.
+            {
+                levelTiledMapRenderer.Update(gameTime);
+                foreach (var gameObject in gameObjects)
+                    gameObject.Update(gameTime, mouseState, keyboardState);
+            }
 
+            // Perform strict time updates.
             {
                 float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
                 strictTimePassed += deltaTime;
