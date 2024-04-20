@@ -40,6 +40,108 @@ namespace SnakeExtreme
     {
         public Point LevelPosition { get; set; }
     }
+    public class Sound
+    {
+        private readonly SoundEffectInstance soundEffectInstance;
+        private readonly static Random random = new Random();
+        private float trueVolume;
+        public Sound(ContentManager content, string asset)
+        {
+            try
+            {
+                soundEffectInstance = content.Load<SoundEffect>(asset).CreateInstance();
+                Mode = Modes.AudioAvailable;
+            }
+            catch (NoAudioHardwareException)
+            {
+                Mode = Modes.NoAudio;
+            }
+            Volume = 0.5f;
+        }
+        public enum Modes { NoAudio, AudioAvailable }
+        public Modes Mode { get; }
+        public void Play(bool randomPitch = false)
+        {
+            if (Mode == Modes.AudioAvailable)
+            {
+                soundEffectInstance.Pitch = 
+                    (randomPitch ? random.NextSingle() - 0.5f : 0);                
+                soundEffectInstance.Play();
+            }
+        } 
+        public void Stop()
+        {
+            if (Playing)
+            {
+                soundEffectInstance.Stop();
+            }
+        }
+        public bool Playing 
+        { 
+            get
+            {                
+                if (Mode == Modes.AudioAvailable)
+                {
+                    return soundEffectInstance.State == SoundState.Playing;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+        public float Volume 
+        {
+            get => trueVolume;
+            set
+            {
+                Debug.Assert(0 <= value && value <= 1);
+                trueVolume = value;
+                if (Mode == Modes.AudioAvailable)
+                {
+                    soundEffectInstance.Volume = Utility.cerp(0, 1, trueVolume, Utility.PowSpeedTable);
+                }
+            }
+        }
+    }
+    public static class Utility
+    {
+        public static readonly IEnumerable<float> PowSpeedTable = GetPowTable(b: (float)Math.Exp(0), resolution: 64);
+        public static IEnumerable<float> GetPowTable(float b = 2, int resolution = 32)
+        {
+            Trace.Assert(resolution > 0);
+            foreach (var i in Enumerable.Range(0, resolution))
+            {
+                yield return (float)Math.Pow(i, b);
+            }
+        }
+        public static IEnumerable<float> CumulativeSum(this IEnumerable<float> values)
+        {
+            float total = 0;
+            foreach (var value in values)
+            {
+                total += value;
+                yield return total;
+            }
+        }
+        public static float cerp(float lowValue, float highValue, float amount, IEnumerable<float> speedTable)
+        {
+            Debug.Assert(amount >= 0 && amount <= 1);
+            Debug.Assert(speedTable.All((x) => x >= 0));
+
+            var positionTable = speedTable.CumulativeSum().ToArray();
+            var reversed = lowValue > highValue;
+            if (reversed)
+            {
+                amount = 1 - amount;
+                (lowValue, highValue) = (highValue, lowValue);
+            }
+            var distance = highValue - lowValue;
+            var index = (int)Math.Round(amount * (positionTable.Length - 1));
+            var result = distance * ((positionTable[index] - positionTable.First()) / positionTable.Last()) + lowValue;
+            return result;
+        }
+    }
     public class Board : IObject, ITangible
     {
         private readonly AnimatedSprite panelSprite;
@@ -749,8 +851,8 @@ namespace SnakeExtreme
         public void QuickVanish()
         {
             State = States.QuickVanish;
-            waitCount = 7;
-            waitTotal = 8;
+            waitCount = 3;
+            waitTotal = 4;
             shadowScale = 1;
             ballScale = 1;
             ballAlpha = 1;
@@ -760,8 +862,8 @@ namespace SnakeExtreme
         public void QuickAppear()
         {
             State = States.QuickAppear;
-            waitCount = 7;
-            waitTotal = 8;
+            waitCount = 3;
+            waitTotal = 4;
             shadowScale = 0;
             ballScale = 0;
             ballAlpha = 1;
@@ -771,8 +873,8 @@ namespace SnakeExtreme
         public void LongVanish()
         {
             State = States.LongVanish;
-            waitCount = 15;
-            waitTotal = 16;
+            waitCount = 7;
+            waitTotal = 8;
             shadowScale = 1;
             ballScale = 1;
             ballAlpha = 1;
@@ -782,8 +884,8 @@ namespace SnakeExtreme
         public void LongAppear()
         {
             State = States.LongAppear;
-            waitCount = 15;
-            waitTotal = 16;
+            waitCount = 7;
+            waitTotal = 8;
             shadowScale = 0;
             ballScale = 1;
             ballAlpha = 0;
@@ -1060,6 +1162,7 @@ namespace SnakeExtreme
         private Dimmer dimmer;
         private Board board;
         private AnyKey anyKey;
+        private Sound moveSound, foodSound, destroySound, pauseSound;
         private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;        
@@ -1071,6 +1174,14 @@ namespace SnakeExtreme
         {
             var availablePositions = levelPossiblePositions.Except(gameObjects.OfType<ILevelObject>().Select(x => x.LevelPosition)).ToList();
             return availablePositions[random.Next(availablePositions.Count)];
+        }
+        private void pause()
+        {
+            dimmer.Dim();
+            board.Open();
+            PauseState = PauseStates.Pause;
+
+            pauseSound.Play();
         }
         public SnakeExtremeGame()
         {
@@ -1245,9 +1356,15 @@ namespace SnakeExtreme
                 (levelTiledMap.HeightInPixels - board.Size.Height) / 2);
             gameObjects.Add(board);
 
+            moveSound = new Sound(Content, "sounds/move_0");
+            foodSound = new Sound(Content, "sounds/food_0");
+            destroySound = new Sound(Content, "sounds/destroy_0");
+            pauseSound = new Sound(Content, "sounds/pause_0");
 
             snake = new Snake(Content);
             gameObjects.Add(snake);
+
+            pause();
         }
 
         /// <summary>
@@ -1320,9 +1437,7 @@ namespace SnakeExtreme
             {
                 if (PauseState == PauseStates.Resumed)
                 {
-                    dimmer.Dim();
-                    board.Open();
-                    PauseState = PauseStates.Pause;
+                    pause();
                 }
             }
 
@@ -1333,6 +1448,8 @@ namespace SnakeExtreme
                     dimmer.Brighten();
                     board.Close();
                     PauseState = PauseStates.Resume;
+
+                    pauseSound.Play();
                 }
             }
 
@@ -1373,6 +1490,8 @@ namespace SnakeExtreme
                         highScorePanel.Flash();
                     }
                     GameState = GameStates.Destroy;
+
+                    destroySound.Play();
                 }
                 else if (snakeNextLevelPosition == food.LevelPosition)
                 {
@@ -1385,12 +1504,17 @@ namespace SnakeExtreme
                     currentScorePanel.Flash();
                     FoodState = FoodStates.NewFood;
                     GameState = GameStates.Action;
+
+                    moveSound.Play(randomPitch: true);
+                    foodSound.Play();
                 }
                 else
                 {                    
                     snake.Move(growTail: false);
                     FoodState = FoodStates.Normal;
                     GameState = GameStates.Action;
+
+                    moveSound.Play(randomPitch: true);
                 }                
             }
 

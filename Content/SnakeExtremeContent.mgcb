@@ -248,3 +248,27 @@
 /processorParam:TextureFormat=Color
 /build:sprite_factory/panel_1.png
 
+#begin sounds/move_0.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/move_0.wav
+
+#begin sounds/food_0.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/food_0.wav
+
+#begin sounds/destroy_0.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/destroy_0.wav
+
+#begin sounds/pause_0.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/pause_0.wav
+
