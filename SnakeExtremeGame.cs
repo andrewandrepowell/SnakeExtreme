@@ -18,6 +18,8 @@ using Microsoft.Xna.Framework.Content;
 using MonoGame.Extended;
 using System.Collections.ObjectModel;
 using MonoGame.Extended.BitmapFonts;
+using System.Text;
+using Microsoft.Extensions.Primitives;
 
 
 namespace SnakeExtreme
@@ -41,7 +43,28 @@ namespace SnakeExtreme
     public class Board : IObject, ITangible
     {
         private readonly AnimatedSprite panelSprite;
-        private Vector2 truePosition, panelDrawPosition;        
+        private readonly BitmapFont textBitmapFont;
+        private const int textYOffset = 78;
+        private const int textXOffset = 16;
+        private readonly List<StringBuilder> textLines = new();        
+        private string trueText;
+        private Vector2 truePosition, panelDrawPosition;
+        private List<Vector2> textDrawPositions = new();
+        private int waitCount, waitTotal = 1;
+        private const float boardHeightMax = 64;
+        private float boardHeightOffset = boardHeightMax;
+        private float boardAlpha = 0;
+        private void updateDrawPosition()
+        {
+            panelDrawPosition = truePosition + new Vector2(0, -boardHeightOffset);
+            textDrawPositions.Clear();
+            for (int i = 0; i < textLines.Count; i++)
+            {
+                textDrawPositions.Add(new Vector2(
+                    truePosition.X + textXOffset, 
+                    truePosition.Y + textYOffset - boardHeightOffset + i * textBitmapFont.LineHeight));
+            }
+        }
         public Board(ContentManager content)
         {
             {
@@ -51,18 +74,75 @@ namespace SnakeExtreme
                 panelSprite.Play("panel_0");
                 Size = (Size)spriteSheet.TextureAtlas[0].Size;
             }
+            {
+                textBitmapFont = content.Load<BitmapFont>("fonts/montserrat_1");                
+            }
+            
+        }
+        public string Text
+        {
+            get => trueText;
+            set
+            {
+                trueText = value;
+
+                // Break the text appear to fill in board.
+                textLines.Clear();
+                var lineWidth = Size.Width - 2 * textXOffset;
+                var currLine = new StringBuilder();
+                foreach (var token in trueText.Split(' '))
+                {
+                    if (token == "<n>")
+                    {
+                        textLines.Add(currLine);
+                        currLine = new StringBuilder();
+                    }
+                    else
+                    {
+                        var tokenWidth = textBitmapFont.MeasureString(token).Width;
+                        var currLineWidth = textBitmapFont.MeasureString(currLine).Width;
+                        if (tokenWidth + currLineWidth > lineWidth)
+                        {
+                            textLines.Add(currLine);
+                            currLine = new StringBuilder();
+                        }
+                        Debug.Assert(tokenWidth <= lineWidth);
+                        currLine.Append(token + " ");
+                    }
+                }
+                textLines.Add(currLine);
+
+                updateDrawPosition();
+            }
+                
         }
         public enum States { Open, Opened, Close, Closed }
         public void Open()
         {
-
+            waitCount = 29;
+            waitTotal = 30;
+            boardHeightOffset = boardHeightMax;
+            boardAlpha = 0;
+            State = States.Open;
         }
         public void Close()
         {
-
+            waitCount = 29;
+            waitTotal = 30;
+            boardHeightOffset = 0;
+            boardAlpha = 1;
+            State = States.Close;
         }
         public States State { get; private set; } = States.Closed;
-        public Vector2 Position { get; set; }
+        public Vector2 Position 
+        {
+            get => truePosition;
+            set
+            {
+                truePosition = value;
+                updateDrawPosition();
+            }
+        }
         public Size Size { get; }
         public int Priority { get; set; }
         public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
@@ -71,12 +151,50 @@ namespace SnakeExtreme
         }
         public void StrictUpdate()
         {
+            // Update properties
+            float waitRatio = (float)waitCount / waitTotal;
 
+            if (State == States.Open)
+                boardHeightOffset = MathHelper.Lerp(0, boardHeightMax, waitRatio);
+            else if (State == States.Close)
+                boardHeightOffset = MathHelper.Lerp(boardHeightMax, 0, waitRatio);
+            else if (State == States.Opened)
+                boardHeightOffset = 0;
+            else if (State == States.Closed)
+                boardHeightOffset = boardHeightMax;
+
+            updateDrawPosition();
+
+            if (State == States.Open)
+                boardAlpha = MathHelper.Lerp(1, 0, waitRatio);
+            else if (State == States.Close)
+                boardAlpha = MathHelper.Lerp(0, 1, waitRatio);
+            else if (State == States.Opened)
+                boardAlpha = 1;
+            else if (State == States.Closed)
+                boardAlpha = 0;
+
+            // Update states
+            if (State == States.Open && waitCount == 0)
+                State = States.Opened;
+            if (State == States.Close && waitCount == 0)
+                State = States.Closed;
+
+            // Update counter
+            if (waitCount > 0)
+                waitCount--;
         }
         public void Draw(SpriteBatch spriteBatch)
         {
+            panelSprite.Alpha = boardAlpha;
             spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            spriteBatch.Draw(sprite: panelSprite, position: Position);
+            spriteBatch.Draw(sprite: panelSprite, position: panelDrawPosition);
+            foreach ((var textLine, var textDrawPosition) in textLines.Zip(textDrawPositions))
+                spriteBatch.DrawString(
+                    font: textBitmapFont,
+                    text: textLine,
+                    position: textDrawPosition,
+                    color: Color.Black * boardAlpha);
             spriteBatch.End();
         }
     }
@@ -940,6 +1058,7 @@ namespace SnakeExtreme
         private Food food, newFood;
         private Panel currentScorePanel, highScorePanel;
         private Dimmer dimmer;
+        private Board board;
         private AnyKey anyKey;
         private Snake.Directions newDirection;
         private float strictTimePassed;
@@ -1106,6 +1225,26 @@ namespace SnakeExtreme
             };
             gameObjects.Add(dimmer);
 
+            board = new Board(Content)
+            {
+                Priority = dimmer.Priority + 1,
+                Text = "Welcome to Snake Extreme! <n> <n> " +
+                       "Use arrow keys / buttons to direct the snake. Avoid your tail, level boundaries, and the obstacle spheres! " +
+                       "Eat food spheres to gain points and earn a high score! <n> <n> " +
+                       "Use Enter / start button to start or end the game. " +
+                       "Use Escape / pause button to pause the game. <n> <n> " +
+                       "Hitting any key resumes!  <n> <n> " +
+                       "Credits: <n> " +
+                       "Andrew Powell - Game Designer / Programmer - andrewandrepowell2@gmail.com <n> " +
+                       "Rafael Matos - Level Tile Assets, Sphere / Torch Assets - rafa.pixell@gmail.com <n> " +
+                       "Butter Milk - GUI Element Assets - butterishmilk@gmail.com <n> " +
+                       "Julieta Ulanosvsky - Montserrat Font Asset - twitter julietulanovsky <n> "
+            };
+            board.Position = new Vector2(
+                (levelTiledMap.WidthInPixels - board.Size.Width) / 2,
+                (levelTiledMap.HeightInPixels - board.Size.Height) / 2);
+            gameObjects.Add(board);
+
 
             snake = new Snake(Content);
             gameObjects.Add(snake);
@@ -1182,6 +1321,7 @@ namespace SnakeExtreme
                 if (PauseState == PauseStates.Resumed)
                 {
                     dimmer.Dim();
+                    board.Open();
                     PauseState = PauseStates.Pause;
                 }
             }
@@ -1191,15 +1331,16 @@ namespace SnakeExtreme
                 if (PauseState == PauseStates.Paused)
                 {
                     dimmer.Brighten();
+                    board.Close();
                     PauseState = PauseStates.Resume;
                 }
             }
 
             // Service state changes.
-            if (PauseState == PauseStates.Pause && dimmer.State == Dimmer.States.Dimmed)
+            if (PauseState == PauseStates.Pause && dimmer.State == Dimmer.States.Dimmed && board.State == Board.States.Opened)
                 PauseState = PauseStates.Paused;
 
-            if (PauseState == PauseStates.Resume && dimmer.State == Dimmer.States.None)
+            if (PauseState == PauseStates.Resume && dimmer.State == Dimmer.States.None && board.State == Board.States.Closed)
                 PauseState = PauseStates.Resumed;
 
             if (PauseState == PauseStates.Resumed && GameState == GameStates.Create && snake.State == Snake.States.Normal && food.State == Food.States.Normal)

@@ -219,3 +219,32 @@
 /processorParam:TextureFormat=Color
 /build:fonts/montserrat_0_0.png
 
+#begin fonts/montserrat_1.fnt
+/importer:BitmapFontImporter
+/processor:BitmapFontProcessor
+/build:fonts/montserrat_1.fnt
+
+#begin fonts/montserrat_1_0.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255, 0, 255, 255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:fonts/montserrat_1_0.png
+
+#begin sprite_factory/panel_1.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255, 0, 255, 255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:sprite_factory/panel_1.png
+

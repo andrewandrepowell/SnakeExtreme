@@ -1,0 +1,14 @@
+{
+  "textureAtlas": {
+    "texture": "panel_1.png",
+    "regionWidth": 640,
+    "regionHeight": 480
+  },
+  "cycles": {
+    "panel_0": {
+      "frames": [0],
+      "isLooping": false,
+      "frameDuration": 0.2
+    }
+  }
+}
