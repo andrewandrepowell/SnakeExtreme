@@ -785,6 +785,7 @@ namespace SnakeExtreme
         private Snake snake;
         private Food food, newFood;
         private Panel currentScorePanel, highScorePanel;
+        private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;        
         private int waitCount;
@@ -940,14 +941,6 @@ namespace SnakeExtreme
 
             snake = new Snake(Content);
             gameObjects.Add(snake);
-            //Console.WriteLine($"CWD: {System.AppDomain.CurrentDomain.BaseDirectory}");
-            //spriteSheet = Content.Load<SpriteSheet>("sprite_factory/fire_candelabrum_0.sf", new JsonContentLoader());
-            //sprite = new AnimatedSprite(spriteSheet);
-            //sprite.Play("flame_0");
-
-            //var mask0Layer = tiledMap.TileLayers.Where(x => x.Name == "mask_0").First();
-            //var tile = mask0Layer.GetTile(10, 10);
-            //Console.WriteLine($"Tile: {tile.GlobalIdentifier}");
         }
 
         /// <summary>
@@ -976,13 +969,13 @@ namespace SnakeExtreme
 
             // Service buttons
             if (upButton.Pressed)
-                snake.Direction = Snake.Directions.Up;
+                newDirection = Snake.Directions.Up;
             if (downButton.Pressed)
-                snake.Direction = Snake.Directions.Down;
+                newDirection = Snake.Directions.Down;
             if (leftButton.Pressed)
-                snake.Direction = Snake.Directions.Left;
+                newDirection = Snake.Directions.Left;
             if (rightButton.Pressed)
-                snake.Direction = Snake.Directions.Right;
+                newDirection = Snake.Directions.Right;
 
             if (startButton.Pressed)
             {
@@ -995,6 +988,8 @@ namespace SnakeExtreme
                         (int)levelCorners.Select(x => x.X).Average(),
                         (int)levelCorners.Select(x => x.Y).Average());
                     snake.CreateHead(startLevelPosition);
+                    snake.Direction = Snake.Directions.Up;
+                    newDirection = Snake.Directions.Up;
                     gameObjects.Add(snake.Head);
 
                     food = new Food(Content) { LevelPosition = getRandomLevelPosition() };
@@ -1020,12 +1015,15 @@ namespace SnakeExtreme
 
             if (GameState == GameStates.Wait && waitCount == 0)
             {
+                snake.Direction = newDirection;
                 var snakeNextLevelPosition = snake.LevelPosition + Snake.DirectionPoints[snake.Direction];
 
                 var minX = levelCorners.Select(x => x.X).Min();
                 var maxX = levelCorners.Select(x => x.X).Max();
                 var minY = levelCorners.Select(x => x.Y).Min();
-                var maxY = levelCorners.Select(x => x.Y).Max();               
+                var maxY = levelCorners.Select(x => x.Y).Max();
+
+                Console.WriteLine($"Text: {minY}, {maxY}, {snake.Position}, {snake.LevelPosition}");
 
                 if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
                     snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY ||
@@ -1044,7 +1042,7 @@ namespace SnakeExtreme
                 }
                 else if (snakeNextLevelPosition == food.LevelPosition)
                 {
-                    Debug.Assert(newFood == null);
+                    Debug.Assert(newFood == null);                    
                     snake.Move(growTail: true);
                     food.Vanish();
                     newFood = new Food(Content) { LevelPosition = getRandomLevelPosition() };
@@ -1055,7 +1053,7 @@ namespace SnakeExtreme
                     GameState = GameStates.Action;
                 }
                 else
-                {
+                {                    
                     snake.Move(growTail: false);
                     FoodState = FoodStates.Normal;
                     GameState = GameStates.Action;
