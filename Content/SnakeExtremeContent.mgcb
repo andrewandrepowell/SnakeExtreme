@@ -272,3 +272,9 @@
 /processorParam:Quality=Best
 /build:sounds/pause_0.wav
 
+#begin sounds/obstacle_0.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/obstacle_0.wav
+

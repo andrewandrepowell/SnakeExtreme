@@ -40,6 +40,66 @@ namespace SnakeExtreme
     {
         public Point LevelPosition { get; set; }
     }
+    public class Obstacle : IObject, ITangible, ILevelObject
+    {
+        private readonly Ball ball;
+        private Point trueLevelPosition;
+        public Obstacle(ContentManager content)
+        {
+            ball = new Ball(content, 1);
+            ball.LongAppear();
+            State = States.Appear;
+        }
+        public enum States { Appear, Normal, Vanish, Gone }
+        public States State { get; private set; }
+        public void Vanish()
+        {
+            Debug.Assert(State == States.Normal);
+            ball.LongVanish();
+            State = States.Vanish;
+        }
+        public Vector2 Position
+        {
+            get => ball.Position;
+            set => throw new NotImplementedException();
+        }
+        public Size Size
+        {
+            get => ball.Size;
+        }
+        public int Priority
+        {
+            get => ball.Priority;
+            set => throw new NotImplementedException();
+        }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {
+            if (State == States.Appear && ball.State == Ball.States.Normal)
+                State = States.Normal;
+
+            if (State == States.Vanish && ball.State == Ball.States.Invisible)
+                State = States.Gone;
+
+            ball.Update(gameTime, mouseState, keyboardState);
+        }
+        public void StrictUpdate()
+        {
+            ball.StrictUpdate();
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            ball.Draw(spriteBatch);
+        }
+        public Point LevelPosition
+        {
+            get => trueLevelPosition;
+            set
+            {
+                trueLevelPosition = value;
+                ball.Position = new Vector2(trueLevelPosition.X * Size.Width, trueLevelPosition.Y * Size.Height);
+            }
+        }
+    }
     public class Sound
     {
         private readonly SoundEffectInstance soundEffectInstance;
@@ -140,6 +200,10 @@ namespace SnakeExtreme
             var index = (int)Math.Round(amount * (positionTable.Length - 1));
             var result = distance * ((positionTable[index] - positionTable.First()) / positionTable.Last()) + lowValue;
             return result;
+        }
+        public static IEnumerable<T> Chain<T>(this IEnumerable<T> curr, IEnumerable<T> other)
+        {
+            return new IEnumerable<T>[] { curr, other }.SelectMany(x => x);
         }
     }
     public class Board : IObject, ITangible
@@ -1154,29 +1218,34 @@ namespace SnakeExtreme
         private SpriteBatch spriteBatch;
         private TiledMap levelTiledMap;
         private TiledMapRenderer levelTiledMapRenderer;
-        private List<IObject> gameObjects;
+        private List<IObject> gameObjects = new();
         private Button upButton, downButton, leftButton, rightButton, startButton, pauseButton;
         private Snake snake;
         private Food food, newFood;
+        private List<Obstacle> obstacles = new();        
         private Panel currentScorePanel, highScorePanel;
         private Dimmer dimmer;
         private Board board;
         private AnyKey anyKey;
-        private Sound moveSound, foodSound, destroySound, pauseSound;
+        private Sound moveSound, foodSound, destroySound, pauseSound, obstacleSound;
         private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;
         private const int minWait = 4;
         private const int maxWait = 15;
         private const int scorePerLevelUpdate = 5;
+        private const int obstacleStartThreshold = 1 * scorePerLevelUpdate;
+        private const int obstaclesPerLevelUpdate = 2;
         private int waitCount;
         private int waitTotal;
         private bool gameDestroy = false;
-        private List<Point> levelCorners;
-        private List<Point> levelPossiblePositions;
-        private Point getRandomLevelPosition()
+        private List<Point> levelCorners = new();
+        private List<Point> levelPossiblePositions = new();     
+        private Point getRandomLevelPosition(IEnumerable<Point> additionalPositions = null)
         {
-            var availablePositions = levelPossiblePositions.Except(gameObjects.OfType<ILevelObject>().Select(x => x.LevelPosition)).ToList();
+            if (additionalPositions == null)
+                additionalPositions = [];
+            var availablePositions = levelPossiblePositions.Except(gameObjects.OfType<ILevelObject>().Select(x => x.LevelPosition).Chain(additionalPositions)).ToList();
             return availablePositions[random.Next(availablePositions.Count)];
         }
         private void pause()
@@ -1224,9 +1293,7 @@ namespace SnakeExtreme
             // TODO: Use this.Content to load your game content here
             levelTiledMap = Content.Load<TiledMap>("tiled_project/level_0");
             levelTiledMapRenderer = new TiledMapRenderer(GraphicsDevice, levelTiledMap);
-            var maskLayer = levelTiledMap.TileLayers.Where(x => x.Name == "mask_0").First();            
-            gameObjects = new();
-            levelCorners = new();            
+            var maskLayer = levelTiledMap.TileLayers.Where(x => x.Name == "mask_0").First();                      
             for (int x = 0; x < levelTiledMap.Width; x++)
             {
                 for (int y = 0; y < levelTiledMap.Height; y++)
@@ -1320,8 +1387,7 @@ namespace SnakeExtreme
             Debug.Assert(highScorePanel != null);
             Debug.Assert(levelCorners.Count == 2);
 
-            {
-                levelPossiblePositions = new();
+            {                
                 var minX = levelCorners.Select(x => x.X).Min();
                 var maxX = levelCorners.Select(x => x.X).Max();
                 var minY = levelCorners.Select(x => x.Y).Min();
@@ -1364,6 +1430,7 @@ namespace SnakeExtreme
             foodSound = new Sound(Content, "sounds/food_0");
             destroySound = new Sound(Content, "sounds/destroy_0");
             pauseSound = new Sound(Content, "sounds/pause_0");
+            obstacleSound = new Sound(Content, "sounds/obstacle_0");
 
             snake = new Snake(Content);
             gameObjects.Add(snake);
@@ -1426,7 +1493,7 @@ namespace SnakeExtreme
                         gameObjects.Add(food);
 
                         currentScorePanel.Value = 0;
-                        currentScorePanel.Flash();
+                        currentScorePanel.Flash();                        
 
                         GameState = GameStates.Create;
                     }
@@ -1484,19 +1551,26 @@ namespace SnakeExtreme
                 if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
                     snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY ||
                     snake.Bodies.Any(x=> x.LevelPosition == snakeNextLevelPosition && x != snake.Tail) ||
+                    obstacles.Any(x => x.LevelPosition == snakeNextLevelPosition) ||
+                    (levelPossiblePositions.Count <= (snake.Count + 2 + obstacles.Count + obstaclesPerLevelUpdate)) ||
                     gameDestroy)
                 {
                     gameDestroy = false;
+
                     snake.Vanish();
                     food.Vanish();
+                    foreach (var obstacle in obstacles)
+                        obstacle.Vanish();
+
                     if (currentScorePanel.Value > highScorePanel.Value)
                     {
                         highScorePanel.Value = currentScorePanel.Value;
                         highScorePanel.Flash();
                     }
-                    GameState = GameStates.Destroy;
 
                     destroySound.Play();
+
+                    GameState = GameStates.Destroy;                    
                 }
                 else if (snakeNextLevelPosition == food.LevelPosition)
                 {
@@ -1505,30 +1579,41 @@ namespace SnakeExtreme
                     snake.Move(growTail: true);
 
                     food.Vanish();
-                    newFood = new Food(Content) { LevelPosition = getRandomLevelPosition() };
-                    gameObjects.Add(newFood);
+                    newFood = new Food(Content) { LevelPosition = getRandomLevelPosition([snakeNextLevelPosition]) };
+                    gameObjects.Add(newFood);                    
 
                     currentScorePanel.Value += 1;
                     currentScorePanel.Flash();
 
-                    FoodState = FoodStates.NewFood;
-                    GameState = GameStates.Action;
+                    if (currentScorePanel.Value >= obstacleStartThreshold && currentScorePanel.Value % scorePerLevelUpdate == 0)
+                    {
+                        for (int i = 0; i < obstaclesPerLevelUpdate; i++)
+                        {
+                            var obstacle = new Obstacle(Content) { LevelPosition = getRandomLevelPosition([snakeNextLevelPosition]) };
+                            obstacles.Add(obstacle);
+                            gameObjects.Add(obstacle);
+                        }
+                        obstacleSound.Play();
+                    }
 
                     moveSound.Play(randomPitch: true);
                     foodSound.Play();
+
+                    FoodState = FoodStates.NewFood;
+                    GameState = GameStates.Action;
                 }
                 else
                 {                    
                     snake.Move(growTail: false);
 
-                    FoodState = FoodStates.Normal;
-                    GameState = GameStates.Action;
-
                     moveSound.Play(randomPitch: true);
+
+                    FoodState = FoodStates.Normal;
+                    GameState = GameStates.Action;                    
                 }                
             }
 
-            if (PauseState == PauseStates.Resumed && GameState == GameStates.Action && snake.State == Snake.States.Normal)
+            if (PauseState == PauseStates.Resumed && GameState == GameStates.Action && snake.State == Snake.States.Normal && obstacles.All(x => x.State == Obstacle.States.Normal))
             {
                 if (FoodState == FoodStates.NewFood && food.State == Food.States.Gone && newFood.State == Food.States.Normal)
                 {
@@ -1552,7 +1637,10 @@ namespace SnakeExtreme
                 }
             }
 
-            if (PauseState == PauseStates.Resumed && GameState == GameStates.Destroy && snake.State == Snake.States.Gone && food.State == Food.States.Gone)
+            if (PauseState == PauseStates.Resumed && GameState == GameStates.Destroy && 
+                snake.State == Snake.States.Gone && 
+                food.State == Food.States.Gone && 
+                obstacles.All(x => x.State == Obstacle.States.Gone))
             {
                 foreach (var body in snake.Bodies)
                     gameObjects.Remove(body);
@@ -1560,6 +1648,10 @@ namespace SnakeExtreme
 
                 gameObjects.Remove(food);
                 food = null;
+
+                foreach (var obstacle in obstacles)
+                    gameObjects.Remove(obstacle);
+                obstacles.Clear();
 
                 GameState = GameStates.Start;
             }
