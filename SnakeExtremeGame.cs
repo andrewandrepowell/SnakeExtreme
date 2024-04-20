@@ -38,6 +38,44 @@ namespace SnakeExtreme
     {
         public Point LevelPosition { get; set; }
     }
+    public class AnyKey : IObject
+    {
+        public bool Selected { get; private set; } = false;
+        public bool Pressed { get; private set; } = false;
+        public bool Released { get; private set; } = false;
+        public int Priority { get => 0; set => throw new NotImplementedException(); }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {
+            if (!Selected && (mouseState.LeftButton == ButtonState.Pressed ||
+                mouseState.RightButton == ButtonState.Pressed ||
+                keyboardState.GetPressedKeyCount() > 0))
+            {
+                Selected = true;
+                Pressed = true;
+            }
+            else
+            {
+                Pressed = false;
+            }
+            if (Selected && (mouseState.LeftButton != ButtonState.Pressed &&
+                mouseState.RightButton != ButtonState.Pressed &&
+                keyboardState.GetPressedKeyCount() == 0))
+            {
+                Selected = false;
+                Released = true;
+            }
+            else
+            {
+                Released = false;
+            }
+        }
+        public void StrictUpdate()
+        {
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+        }
+    }
     public class Dimmer : IObject, ITangible
     {
         private readonly Effect silhouetteEffect;
@@ -64,15 +102,15 @@ namespace SnakeExtreme
         }
         public void Dim()
         {
-            waitCount = 29;
-            waitTotal = 30;
+            waitCount = 14;
+            waitTotal = 15;
             currAlpha = 0;
             State = States.Dim;
         }
         public void Brighten()
         {
-            waitCount = 29;
-            waitTotal = 30;
+            waitCount = 14;
+            waitTotal = 15;
             currAlpha = maxAlpha;
             State = States.Brighten;
         }
@@ -865,6 +903,7 @@ namespace SnakeExtreme
         private Food food, newFood;
         private Panel currentScorePanel, highScorePanel;
         private Dimmer dimmer;
+        private AnyKey anyKey;
         private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;        
@@ -1021,6 +1060,9 @@ namespace SnakeExtreme
                         levelPossiblePositions.Add(new Point(x, y));                                    
             }
 
+            anyKey = new AnyKey();
+            gameObjects.Add(anyKey);
+
             dimmer = new Dimmer(Content, levelTiledMap.WidthInPixels, levelTiledMap.HeightInPixels)
             {
                 Priority = levelTiledMap.WidthInPixels * levelTiledMap.HeightInPixels
@@ -1105,7 +1147,11 @@ namespace SnakeExtreme
                     dimmer.Dim();
                     PauseState = PauseStates.Pause;
                 }
-                else if (PauseState == PauseStates.Paused)
+            }
+
+            if (anyKey.Pressed)
+            {
+                if (PauseState == PauseStates.Paused)
                 {
                     dimmer.Brighten();
                     PauseState = PauseStates.Resume;
