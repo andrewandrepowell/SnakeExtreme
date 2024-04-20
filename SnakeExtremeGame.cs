@@ -366,6 +366,11 @@ namespace SnakeExtreme
     }
     public class AnyKey : IObject
     {
+        private readonly Sound blankSound;
+        public AnyKey(ContentManager content)
+        {
+            blankSound = new Sound(content, "sounds/move_0") { Volume = 0 };
+        }
         public bool Selected { get; private set; } = false;
         public bool Pressed { get; private set; } = false;
         public bool Released { get; private set; } = false;
@@ -378,6 +383,11 @@ namespace SnakeExtreme
             {
                 Selected = true;
                 Pressed = true;
+
+                // This here is a hack. I have no idea why, but playing an empty sound, i.e. volume is 0,
+                // causes the "The AudioContext was not allowed to start" issue fixed upon launch.
+                // Need to research more as to why this works.
+                blankSound.Play();
             }
             else
             {
@@ -1248,14 +1258,6 @@ namespace SnakeExtreme
             var availablePositions = levelPossiblePositions.Except(gameObjects.OfType<ILevelObject>().Select(x => x.LevelPosition).Chain(additionalPositions)).ToList();
             return availablePositions[random.Next(availablePositions.Count)];
         }
-        private void pause()
-        {
-            dimmer.Dim();
-            board.Open();
-            PauseState = PauseStates.Pause;
-
-            pauseSound.Play();
-        }
         public SnakeExtremeGame()
         {
             graphics = new GraphicsDeviceManager(this);
@@ -1397,7 +1399,7 @@ namespace SnakeExtreme
                         levelPossiblePositions.Add(new Point(x, y));                                    
             }
 
-            anyKey = new AnyKey();
+            anyKey = new AnyKey(Content);
             gameObjects.Add(anyKey);
 
             dimmer = new Dimmer(Content, levelTiledMap.WidthInPixels, levelTiledMap.HeightInPixels)
@@ -1416,10 +1418,11 @@ namespace SnakeExtreme
                        "Use Escape / pause button to pause the game. <n> <n> " +
                        "Hitting any key resumes!  <n> <n> " +
                        "Credits: <n> " +
-                       "Andrew Powell - Game Designer / Programmer - andrewandrepowell2@gmail.com <n> " +
-                       "Rafael Matos - Level Tile Assets, Sphere / Torch Assets - rafa.pixell@gmail.com <n> " +
-                       "Butter Milk - GUI Element Assets - butterishmilk@gmail.com <n> " +
-                       "Julieta Ulanosvsky - Montserrat Font Asset - twitter julietulanovsky <n> "
+                       "Andrew Powell - Game Designer / Programmer - andrewandrepowell.itch.io <n> " +
+                       "Rafael Matos - Level Tile Assets, Sphere / Torch Assets - rafaelmatos.itch.io <n> " +
+                       "Butter Milk - GUI Element Assets - butterymilk.itch.io <n> " +
+                       "Julieta Ulanosvsky - Montserrat Font Asset - github.com/JulietaUla <n> " +
+                       "Joel Francis Burford - Sound Effects - joelfrancisburford.itch.io <n> "
             };
             board.Position = new Vector2(
                 (levelTiledMap.WidthInPixels - board.Size.Width) / 2,
@@ -1435,7 +1438,9 @@ namespace SnakeExtreme
             snake = new Snake(Content);
             gameObjects.Add(snake);
 
-            pause();
+            dimmer.Dim();
+            board.Open();
+            PauseState = PauseStates.Pause;
         }
 
         /// <summary>
@@ -1508,7 +1513,10 @@ namespace SnakeExtreme
             {
                 if (PauseState == PauseStates.Resumed)
                 {
-                    pause();
+                    dimmer.Dim();
+                    board.Open();
+                    pauseSound.Play();
+                    PauseState = PauseStates.Pause;
                 }
             }
 
@@ -1518,9 +1526,8 @@ namespace SnakeExtreme
                 {
                     dimmer.Brighten();
                     board.Close();
-                    PauseState = PauseStates.Resume;
-
                     pauseSound.Play();
+                    PauseState = PauseStates.Resume;                    
                 }
             }
 
