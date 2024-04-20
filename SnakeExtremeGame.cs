@@ -1165,8 +1165,12 @@ namespace SnakeExtreme
         private Sound moveSound, foodSound, destroySound, pauseSound;
         private Snake.Directions newDirection;
         private float strictTimePassed;
-        private const float strictTimeAmount = (float)1 / 30;        
+        private const float strictTimeAmount = (float)1 / 30;
+        private const int minWait = 4;
+        private const int maxWait = 15;
+        private const int scorePerLevelUpdate = 5;
         private int waitCount;
+        private int waitTotal;
         private bool gameDestroy = false;
         private List<Point> levelCorners;
         private List<Point> levelPossiblePositions;
@@ -1462,7 +1466,8 @@ namespace SnakeExtreme
 
             if (PauseState == PauseStates.Resumed && GameState == GameStates.Create && snake.State == Snake.States.Normal && food.State == Food.States.Normal)
             {
-                waitCount = 15;
+                waitTotal = maxWait;
+                waitCount = waitTotal - 1;
                 GameState = GameStates.Wait;
             }
 
@@ -1495,13 +1500,17 @@ namespace SnakeExtreme
                 }
                 else if (snakeNextLevelPosition == food.LevelPosition)
                 {
-                    Debug.Assert(newFood == null);                    
+                    Debug.Assert(newFood == null);      
+                    
                     snake.Move(growTail: true);
+
                     food.Vanish();
                     newFood = new Food(Content) { LevelPosition = getRandomLevelPosition() };
                     gameObjects.Add(newFood);
+
                     currentScorePanel.Value += 1;
                     currentScorePanel.Flash();
+
                     FoodState = FoodStates.NewFood;
                     GameState = GameStates.Action;
 
@@ -1511,6 +1520,7 @@ namespace SnakeExtreme
                 else
                 {                    
                     snake.Move(growTail: false);
+
                     FoodState = FoodStates.Normal;
                     GameState = GameStates.Action;
 
@@ -1525,14 +1535,19 @@ namespace SnakeExtreme
                     gameObjects.Remove(food);
                     food = newFood;
                     newFood = null;
-                    waitCount = 15;
+
+                    waitTotal = (int)MathHelper.Lerp(maxWait, minWait, 
+                        (float)currentScorePanel.Value / ((scorePerLevelUpdate * (maxWait - minWait))));                    
+
+                    waitCount = waitTotal - 1;
                     GameState = GameStates.Wait;
                 }
                 else if (FoodState == FoodStates.Normal)
                 {
                     Debug.Assert(food.State == Food.States.Normal);
                     Debug.Assert(newFood == null);
-                    waitCount = 15;
+
+                    waitCount = waitTotal - 1;
                     GameState = GameStates.Wait;
                 }
             }
