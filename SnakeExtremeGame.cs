@@ -38,6 +38,48 @@ namespace SnakeExtreme
     {
         public Point LevelPosition { get; set; }
     }
+    public class Board : IObject, ITangible
+    {
+        private readonly AnimatedSprite panelSprite;
+        private Vector2 truePosition, panelDrawPosition;        
+        public Board(ContentManager content)
+        {
+            {
+                var spriteSheet = content.Load<SpriteSheet>("sprite_factory/panel_1.sf", new JsonContentLoader());
+                panelSprite = new AnimatedSprite(spriteSheet);
+                panelSprite.Origin = Vector2.Zero;
+                panelSprite.Play("panel_0");
+                Size = (Size)spriteSheet.TextureAtlas[0].Size;
+            }
+        }
+        public enum States { Open, Opened, Close, Closed }
+        public void Open()
+        {
+
+        }
+        public void Close()
+        {
+
+        }
+        public States State { get; private set; } = States.Closed;
+        public Vector2 Position { get; set; }
+        public Size Size { get; }
+        public int Priority { get; set; }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {
+            panelSprite.Update(gameTime);
+        }
+        public void StrictUpdate()
+        {
+
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            spriteBatch.Draw(sprite: panelSprite, position: Position);
+            spriteBatch.End();
+        }
+    }
     public class AnyKey : IObject
     {
         public bool Selected { get; private set; } = false;
@@ -191,7 +233,7 @@ namespace SnakeExtreme
                 messageSprite.Play(messageNameMap[mode]);
             }
             {
-                textBitmapFont = content.Load<BitmapFont>("fonts/montserrat");
+                textBitmapFont = content.Load<BitmapFont>("fonts/montserrat_0");
             }
         }
         public int Value 
@@ -573,8 +615,7 @@ namespace SnakeExtreme
             }
             {
                 silhouetteEffect = content.Load<Effect>("effects/silhouette_0");
-                overlayColorSilhouetteEffectParameter = silhouetteEffect.Parameters["OverlayColor"];
-                overlayColorSilhouetteEffectParameter.SetValue(Color.Black.ToVector4());
+                overlayColorSilhouetteEffectParameter = silhouetteEffect.Parameters["OverlayColor"];                
             }
         }
         public void UpdateFloatHeight(Ball other)
@@ -722,6 +763,7 @@ namespace SnakeExtreme
                 spriteBatch.End();
 
                 ballSprite.Alpha = ballAlpha * silhouetteAlpha;
+                overlayColorSilhouetteEffectParameter.SetValue(Color.Black.ToVector4());
                 spriteBatch.Begin(samplerState: SamplerState.PointClamp, effect: silhouetteEffect);
                 spriteBatch.Draw(sprite: ballSprite, position: ballDrawPosition, rotation: 0, scale: new Vector2(ballScale));
                 spriteBatch.End();
@@ -766,9 +808,6 @@ namespace SnakeExtreme
         {
             spriteBatch.Begin(samplerState: SamplerState.PointClamp);
             spriteBatch.Draw(sprite: shadowSprite, position: Position);
-            spriteBatch.End();
-
-            spriteBatch.Begin(samplerState: SamplerState.PointClamp);
             spriteBatch.Draw(sprite: torchSprite, position: Position);
             spriteBatch.End();
         }
@@ -881,8 +920,6 @@ namespace SnakeExtreme
         {
             spriteBatch.Begin(samplerState: SamplerState.PointClamp);
             spriteBatch.Draw(sprite: visualSprite, position: Position);
-            spriteBatch.End();
-            spriteBatch.Begin(samplerState: SamplerState.PointClamp);
             spriteBatch.Draw(sprite: messageSprite, position: Position);
             spriteBatch.End();
         }
