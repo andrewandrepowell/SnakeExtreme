@@ -38,6 +38,85 @@ namespace SnakeExtreme
     {
         public Point LevelPosition { get; set; }
     }
+    public class Dimmer : IObject, ITangible
+    {
+        private readonly Effect silhouetteEffect;
+        private readonly EffectParameter overlayColorSilhouetteEffectParameter;
+        private readonly Texture2D dimTexture;
+        private float currAlpha;
+        private const float maxAlpha = 0.75f;
+        private int waitCount;
+        private int waitTotal = 1;
+        public Dimmer(ContentManager content, int width, int height)
+        {
+            Debug.Assert(width > 0);
+            Debug.Assert(height > 0);
+            Size = new Size(width, height);
+            {
+                dimTexture = new Texture2D(content.GetGraphicsDevice(), width, height);
+                var data = Enumerable.Repeat(Color.Black, width * height).ToArray();
+                dimTexture.SetData(data);
+            }
+            {
+                silhouetteEffect = content.Load<Effect>("effects/silhouette_0");
+                overlayColorSilhouetteEffectParameter = silhouetteEffect.Parameters["OverlayColor"];
+            }
+        }
+        public void Dim()
+        {
+            waitCount = 29;
+            waitTotal = 30;
+            currAlpha = 0;
+            State = States.Dim;
+        }
+        public void Brighten()
+        {
+            waitCount = 29;
+            waitTotal = 30;
+            currAlpha = maxAlpha;
+            State = States.Brighten;
+        }
+        public enum States { None, Dim, Dimmed, Brighten }
+        public States State { get; private set; } = States.None;
+        public Color DimColor { get; set; } = Color.Black;
+        public Vector2 Position { get; set; }
+        public Size Size { get; }
+        public int Priority { get; set; }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {            
+        }
+        public void StrictUpdate()
+        {
+            float waitRatio = (float)waitCount / waitTotal;
+
+            if (State == States.Dim)
+                currAlpha = MathHelper.Lerp(maxAlpha, 0, waitRatio);
+            else if (State == States.Brighten)
+                currAlpha = MathHelper.Lerp(0, maxAlpha, waitRatio);
+            else if (State == States.None)
+                currAlpha = 0;
+            else if (State == States.Dimmed)
+                currAlpha = maxAlpha;
+
+            if (State == States.Dim && waitCount == 0)
+                State = States.Dimmed;
+            if (State == States.Brighten && waitCount == 0)
+                State = States.None;
+
+            if (waitCount > 0)
+                waitCount--;
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            if (State != States.None)
+            {
+                overlayColorSilhouetteEffectParameter.SetValue(DimColor.ToVector4());
+                spriteBatch.Begin(samplerState: SamplerState.PointClamp, effect: silhouetteEffect);
+                spriteBatch.Draw(texture: dimTexture, position: Position, color: Color.White * currAlpha);
+                spriteBatch.End();
+            }
+        }
+    }
     public class Panel : IObject, ITangible
     {        
         private readonly AnimatedSprite panelSprite;
@@ -785,6 +864,7 @@ namespace SnakeExtreme
         private Snake snake;
         private Food food, newFood;
         private Panel currentScorePanel, highScorePanel;
+        private Dimmer dimmer;
         private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;        
@@ -804,8 +884,10 @@ namespace SnakeExtreme
         }
         public enum FoodStates { Normal, NewFood }
         public enum GameStates { Start, Create, Wait, Action, Destroy }
+        public enum PauseStates { Resumed, Pause, Paused, Resume }
         public GameStates GameState { get; private set; } = GameStates.Start;
         public FoodStates FoodState { get; private set; } = FoodStates.Normal;
+        public PauseStates PauseState { get; private set; } = PauseStates.Resumed;
 
         /// <summary>
         /// Allows the game to perform any initialization it needs to before starting to run.
@@ -939,6 +1021,13 @@ namespace SnakeExtreme
                         levelPossiblePositions.Add(new Point(x, y));                                    
             }
 
+            dimmer = new Dimmer(Content, levelTiledMap.WidthInPixels, levelTiledMap.HeightInPixels)
+            {
+                Priority = levelTiledMap.WidthInPixels * levelTiledMap.HeightInPixels
+            };
+            gameObjects.Add(dimmer);
+
+
             snake = new Snake(Content);
             gameObjects.Add(snake);
         }
@@ -979,41 +1068,64 @@ namespace SnakeExtreme
 
             if (startButton.Pressed)
             {
-                if (GameState == GameStates.Start)
+                if (PauseState == PauseStates.Resumed)
                 {
-                    Debug.Assert(snake.Headless);
-                    Debug.Assert(food == null);
+                    if (GameState == GameStates.Start)
+                    {
+                        Debug.Assert(snake.Headless);
+                        Debug.Assert(food == null);
 
-                    var startLevelPosition = new Point(
-                        (int)levelCorners.Select(x => x.X).Average(),
-                        (int)levelCorners.Select(x => x.Y).Average());
-                    snake.CreateHead(startLevelPosition);
-                    snake.Direction = Snake.Directions.Up;
-                    newDirection = Snake.Directions.Up;
-                    gameObjects.Add(snake.Head);
+                        var startLevelPosition = new Point(
+                            (int)levelCorners.Select(x => x.X).Average(),
+                            (int)levelCorners.Select(x => x.Y).Average());
+                        snake.CreateHead(startLevelPosition);
+                        snake.Direction = Snake.Directions.Up;
+                        newDirection = Snake.Directions.Up;
+                        gameObjects.Add(snake.Head);
 
-                    food = new Food(Content) { LevelPosition = getRandomLevelPosition() };
-                    gameObjects.Add(food);
+                        food = new Food(Content) { LevelPosition = getRandomLevelPosition() };
+                        gameObjects.Add(food);
 
-                    currentScorePanel.Value = 0;
-                    currentScorePanel.Flash();
+                        currentScorePanel.Value = 0;
+                        currentScorePanel.Flash();
 
-                    GameState = GameStates.Create;
+                        GameState = GameStates.Create;
+                    }
+                    else
+                    {
+                        gameDestroy = true;
+                    }
                 }
-                else
+            }
+
+            if (pauseButton.Pressed)
+            {
+                if (PauseState == PauseStates.Resumed)
                 {
-                    gameDestroy = true;
+                    dimmer.Dim();
+                    PauseState = PauseStates.Pause;
+                }
+                else if (PauseState == PauseStates.Paused)
+                {
+                    dimmer.Brighten();
+                    PauseState = PauseStates.Resume;
                 }
             }
 
             // Service state changes.
-            if (GameState == GameStates.Create && snake.State == Snake.States.Normal && food.State == Food.States.Normal)
+            if (PauseState == PauseStates.Pause && dimmer.State == Dimmer.States.Dimmed)
+                PauseState = PauseStates.Paused;
+
+            if (PauseState == PauseStates.Resume && dimmer.State == Dimmer.States.None)
+                PauseState = PauseStates.Resumed;
+
+            if (PauseState == PauseStates.Resumed && GameState == GameStates.Create && snake.State == Snake.States.Normal && food.State == Food.States.Normal)
             {
                 waitCount = 15;
                 GameState = GameStates.Wait;
             }
 
-            if (GameState == GameStates.Wait && waitCount == 0)
+            if (PauseState == PauseStates.Resumed && GameState == GameStates.Wait && waitCount == 0)
             {
                 snake.Direction = newDirection;
                 var snakeNextLevelPosition = snake.LevelPosition + Snake.DirectionPoints[snake.Direction];
@@ -1021,9 +1133,7 @@ namespace SnakeExtreme
                 var minX = levelCorners.Select(x => x.X).Min();
                 var maxX = levelCorners.Select(x => x.X).Max();
                 var minY = levelCorners.Select(x => x.Y).Min();
-                var maxY = levelCorners.Select(x => x.Y).Max();
-
-                Console.WriteLine($"Text: {minY}, {maxY}, {snake.Position}, {snake.LevelPosition}");
+                var maxY = levelCorners.Select(x => x.Y).Max();                
 
                 if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
                     snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY ||
@@ -1060,7 +1170,7 @@ namespace SnakeExtreme
                 }                
             }
 
-            if (GameState == GameStates.Action && snake.State == Snake.States.Normal)
+            if (PauseState == PauseStates.Resumed && GameState == GameStates.Action && snake.State == Snake.States.Normal)
             {
                 if (FoodState == FoodStates.NewFood && food.State == Food.States.Gone && newFood.State == Food.States.Normal)
                 {
@@ -1079,7 +1189,7 @@ namespace SnakeExtreme
                 }
             }
 
-            if (GameState == GameStates.Destroy && snake.State == Snake.States.Gone && food.State == Food.States.Gone)
+            if (PauseState == PauseStates.Resumed && GameState == GameStates.Destroy && snake.State == Snake.States.Gone && food.State == Food.States.Gone)
             {
                 foreach (var body in snake.Bodies)
                     gameObjects.Remove(body);
@@ -1113,8 +1223,6 @@ namespace SnakeExtreme
                         gameObject.StrictUpdate();
                 }
             }
-
-
 
             base.Update(gameTime);
         }
