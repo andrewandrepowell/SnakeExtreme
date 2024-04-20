@@ -1,0 +1,19 @@
+{
+  "textureAtlas": {
+    "texture": "texts_1.png",
+    "regionWidth": 128,
+    "regionHeight": 64
+  },
+  "cycles": {
+    "current_score_0": {
+      "frames": [0],
+      "isLooping": false,
+      "frameDuration": 0.2
+    },
+    "high_score_0": {
+      "frames": [1],
+      "isLooping": false,
+      "frameDuration": 0.2
+    }
+  }
+}

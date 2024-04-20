@@ -17,6 +17,7 @@ using System.Reflection.Metadata;
 using Microsoft.Xna.Framework.Content;
 using MonoGame.Extended;
 using System.Collections.ObjectModel;
+using MonoGame.Extended.BitmapFonts;
 
 
 namespace SnakeExtreme
@@ -36,6 +37,119 @@ namespace SnakeExtreme
     public interface ILevelObject
     {
         public Point LevelPosition { get; set; }
+    }
+    public class Panel : IObject, ITangible
+    {        
+        private readonly AnimatedSprite panelSprite;
+        private readonly AnimatedSprite messageSprite;
+        private readonly BitmapFont textBitmapFont;
+        private readonly static Vector2 textDrawOffset = new Vector2(13, 13);
+        private readonly static ReadOnlyDictionary<Modes, string> messageNameMap = new(new Dictionary<Modes, string>()
+        {
+            { Modes.CurrentScore, "current_score_0" },
+            { Modes.HighScore, "high_score_0" },
+        });
+        private Vector2 truePosition;
+        private Vector2 textDrawPosition;
+        private int trueValue;
+        private string stringValue;
+        private float flashAlpha;
+        private int waitCount;
+        private int waitTotal = 1;
+        public Panel(ContentManager content, Modes mode)
+        {
+            Mode = mode;
+            Value = 0;
+            {
+                var spriteSheet = content.Load<SpriteSheet>("sprite_factory/panel_0.sf", new JsonContentLoader());
+                panelSprite = new AnimatedSprite(spriteSheet);
+                panelSprite.Origin = Vector2.Zero;
+                panelSprite.Play("panel_0");
+                Size = (Size)spriteSheet.TextureAtlas[0].Size;
+            }
+            {
+                var spriteSheet = content.Load<SpriteSheet>("sprite_factory/texts_1.sf", new JsonContentLoader());
+                messageSprite = new AnimatedSprite(spriteSheet);
+                messageSprite.Origin = Vector2.Zero;
+                messageSprite.Play(messageNameMap[mode]);
+            }
+            {
+                textBitmapFont = content.Load<BitmapFont>("fonts/montserrat");
+            }
+        }
+        public int Value 
+        {
+            get => trueValue;
+            set
+            {
+                Debug.Assert(value >= 0);
+                trueValue = value;
+                stringValue = $"{trueValue}";
+            }
+        }
+        public enum Modes { CurrentScore, HighScore };
+        public Modes Mode { get; }
+        public enum States { Normal, Flash }
+        public States State { get; private set; } = States.Normal;
+        public void Flash()
+        {
+            waitCount = 29;
+            waitTotal = 30;
+            flashAlpha = 0;
+            State = States.Flash;
+        }
+        public Vector2 Position 
+        {
+            get => truePosition;
+            set
+            {
+                truePosition = value;
+                textDrawPosition = truePosition + textDrawOffset;
+            }
+        }
+        public Size Size { get; }
+        public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {
+            panelSprite.Update(gameTime);
+            messageSprite.Update(gameTime);
+        }
+        public void StrictUpdate()
+        {            
+            if (State == States.Flash)
+            {
+                int halfTotal = waitTotal / 2;
+                if (waitCount >= halfTotal)
+                {
+                    float waitRatio = (float)(waitCount - halfTotal) / halfTotal;
+                    flashAlpha = MathHelper.Lerp(1, 0, waitRatio);                    
+                }
+                else
+                {
+                    float waitRatio = (float)waitCount / halfTotal;
+                    flashAlpha = MathHelper.Lerp(0, 1, waitRatio);
+                }
+            }
+            else
+            {
+                flashAlpha = 0;
+            }
+
+            if (State == States.Flash && waitCount == 0)
+                State = States.Normal;
+
+            if (waitCount > 0)
+                waitCount--;
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            spriteBatch.Draw(sprite: panelSprite, position: truePosition);
+            spriteBatch.Draw(sprite: messageSprite, position: truePosition);
+            spriteBatch.DrawString(font: textBitmapFont, text: stringValue, position: textDrawPosition, color: Color.Black);
+            spriteBatch.DrawString(font: textBitmapFont, text: stringValue, position: textDrawPosition, color: Color.White * flashAlpha);
+            spriteBatch.End();
+        }
     }
     public class Food : IObject, ITangible, ILevelObject
     {
@@ -668,12 +782,13 @@ namespace SnakeExtreme
         private TiledMapRenderer levelTiledMapRenderer;
         private List<IObject> gameObjects;
         private Button upButton, downButton, leftButton, rightButton, startButton, pauseButton;
-        private float strictTimePassed;
-        private const float strictTimeAmount = (float)1 / 30;
         private Snake snake;
         private Food food, newFood;
+        private Panel currentScorePanel, highScorePanel;
+        private float strictTimePassed;
+        private const float strictTimeAmount = (float)1 / 30;        
         private int waitCount;
-        private bool growTail = false;
+        private bool gameDestroy = false;
         private List<Point> levelCorners;
         private List<Point> levelPossiblePositions;
         private Point getRandomLevelPosition()
@@ -785,6 +900,22 @@ namespace SnakeExtreme
                         };
                         gameObjects.Add(pauseButton);
                     }
+                    else if (tile.GlobalIdentifier == 4105)
+                    {
+                        currentScorePanel = new Panel(Content, Panel.Modes.CurrentScore)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(currentScorePanel);
+                    }
+                    else if (tile.GlobalIdentifier == 4106)
+                    {
+                        highScorePanel = new Panel(Content, Panel.Modes.HighScore)
+                        {
+                            Position = position
+                        };
+                        gameObjects.Add(highScorePanel);
+                    }
                 }
             }
 
@@ -792,6 +923,8 @@ namespace SnakeExtreme
             Debug.Assert(downButton != null);
             Debug.Assert(leftButton != null);
             Debug.Assert(rightButton != null);
+            Debug.Assert(currentScorePanel != null);
+            Debug.Assert(highScorePanel != null);
             Debug.Assert(levelCorners.Count == 2);
 
             {
@@ -840,6 +973,8 @@ namespace SnakeExtreme
             catch (NotImplementedException) { /* ignore gamePadState */ }
 
             // TODO: Add your update logic here
+
+            // Service buttons
             if (upButton.Pressed)
                 snake.Direction = Snake.Directions.Up;
             if (downButton.Pressed)
@@ -864,10 +999,19 @@ namespace SnakeExtreme
 
                     food = new Food(Content) { LevelPosition = getRandomLevelPosition() };
                     gameObjects.Add(food);
+
+                    currentScorePanel.Value = 0;
+                    currentScorePanel.Flash();
+
                     GameState = GameStates.Create;
+                }
+                else
+                {
+                    gameDestroy = true;
                 }
             }
 
+            // Service state changes.
             if (GameState == GameStates.Create && snake.State == Snake.States.Normal && food.State == Food.States.Normal)
             {
                 waitCount = 15;
@@ -885,10 +1029,17 @@ namespace SnakeExtreme
 
                 if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
                     snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY ||
-                    snake.Bodies.Any(x=> x.LevelPosition == snakeNextLevelPosition && x != snake.Tail))
+                    snake.Bodies.Any(x=> x.LevelPosition == snakeNextLevelPosition && x != snake.Tail) ||
+                    gameDestroy)
                 {
+                    gameDestroy = false;
                     snake.Vanish();
                     food.Vanish();
+                    if (currentScorePanel.Value > highScorePanel.Value)
+                    {
+                        highScorePanel.Value = currentScorePanel.Value;
+                        highScorePanel.Flash();
+                    }
                     GameState = GameStates.Destroy;
                 }
                 else if (snakeNextLevelPosition == food.LevelPosition)
@@ -898,6 +1049,8 @@ namespace SnakeExtreme
                     food.Vanish();
                     newFood = new Food(Content) { LevelPosition = getRandomLevelPosition() };
                     gameObjects.Add(newFood);
+                    currentScorePanel.Value += 1;
+                    currentScorePanel.Flash();
                     FoodState = FoodStates.NewFood;
                     GameState = GameStates.Action;
                 }
