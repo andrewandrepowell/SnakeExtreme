@@ -1,6 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
   <PropertyGroup>
+    <WasmEnableSIMD>false</WasmEnableSIMD>
+	<WasmEnableExceptionHandling>false</WasmEnableExceptionHandling>
+	<WasmBuildNative>true</WasmBuildNative>
+    <BlazorWebAssemblyJiterpreter>false</BlazorWebAssemblyJiterpreter>
+  </PropertyGroup>
+	
+  <PropertyGroup>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>disable</Nullable>
