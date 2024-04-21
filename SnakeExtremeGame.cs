@@ -990,6 +990,7 @@ namespace SnakeExtreme
         private int waitCount;
         private int waitTotal = 1;
         private float shadowScale = 1.0f;
+        private const float shadowAlpha = 0.5f;
         private float ballScale = 1.0f;
         private float ballAlpha = 1.0f;
         private float silhouetteAlpha = 0.0f;
@@ -1045,8 +1046,7 @@ namespace SnakeExtreme
             {
                 var spriteSheet = content.Load<SpriteSheet>($"sprite_factory/shadow_0.sf", new JsonContentLoader());
                 shadowSprite = new AnimatedSprite(spriteSheet);
-                shadowSprite.Origin = new Vector2(16, 16);
-                shadowSprite.Alpha = 0.5f;
+                shadowSprite.Origin = new Vector2(16, 16);                
                 shadowSprite.Play("shadow_0");
             }
             {
@@ -1264,6 +1264,7 @@ namespace SnakeExtreme
         {
             if (State != States.Invisible)
             {
+                shadowSprite.Alpha = shadowAlpha * ballAlpha;
                 spriteBatch.Begin(samplerState: SamplerState.PointClamp);
                 spriteBatch.Draw(sprite: shadowSprite, position: shadowDrawPosition, rotation: 0, scale: new Vector2(shadowScale));
                 spriteBatch.End();
