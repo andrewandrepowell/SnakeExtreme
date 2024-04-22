@@ -958,6 +958,7 @@ namespace SnakeExtreme
         {
             Debug.Assert(State == States.Gone);
             bodies.Clear();
+            Mode = Modes.Normal;
             State = States.Normal;
         }
         public int Count { get => bodies.Count; }
@@ -968,12 +969,10 @@ namespace SnakeExtreme
         public IEnumerable<SnakeBody> Bodies { get => bodies; }
         public void CreateHead(Point startLevelPosition)
         {
-            Debug.Assert(Headless);            
+            Debug.Assert(Headless);
+            Debug.Assert(Mode == Modes.Normal);
             bodies.Add(new SnakeBody(content) { LevelPosition = startLevelPosition });
-            if (Mode == Modes.Normal)
-                Head.LongAppear();
-            else if (Mode == Modes.Shine)
-                Head.ShineAppear();
+            Head.LongAppear();
             State = States.Appear;
         }
         public void Move(bool growTail = false)
@@ -984,10 +983,10 @@ namespace SnakeExtreme
             this.growTail = growTail;
             foreach (var body in bodies)
             {
-                if (Mode == Modes.Normal)
-                    body.QuickVanish();
-                else if (Mode == Modes.Shine)
+                if (body == Head && Mode == Modes.Shine && body.State == Ball.States.ShineNormal)
                     body.ShineVanish();
+                else
+                    body.QuickVanish();
             }
             State = States.Move;
         }
@@ -1029,18 +1028,16 @@ namespace SnakeExtreme
                         bodies[i].LevelPosition = bodies[i - 1].LevelPosition;
                     if (growTail && i == bodies.Count - 1)
                     {
-                        if (Mode == Modes.Normal)
-                            bodies[i].LongAppear();
-                        else if (Mode == Modes.Shine)
-                            bodies[i].ShineAppear();
+                        bodies[i].LongAppear();
                         bodies[i].UpdateFloatHeight(bodies[i - 1]);
                     }
-                    else
+                    else if (i == 0 && Mode == Modes.Shine)
                     {
-                        if (Mode == Modes.Normal)
-                            bodies[i].QuickAppear();
-                        else if (Mode == Modes.Shine)
-                            bodies[i].ShineAppear();                        
+                        bodies[i].ShineAppear();
+                    }
+                    else  
+                    {
+                        bodies[i].QuickAppear();
                     }
                 }
             }
@@ -1707,7 +1704,7 @@ namespace SnakeExtreme
         private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;
-        private const int minWait = 3;
+        private const int minWait = 5;
         private const int maxWait = 10;
         private const int scorePerLevelUpdate = 5;
         private const int obstacleStartThreshold = 1 * scorePerLevelUpdate;
