@@ -1,0 +1,14 @@
+{
+  "textureAtlas": {
+    "texture": "shine_0.png",
+    "regionWidth": 87,
+    "regionHeight": 87
+  },
+  "cycles": {
+    "shine_0": {
+      "frames": [0,1,2],
+      "isLooping": true,
+      "frameDuration": 0.2
+    }
+  }
+}

@@ -21,6 +21,9 @@ using MonoGame.Extended.BitmapFonts;
 using System.Text;
 using Microsoft.Extensions.Primitives;
 using Microsoft.Xna.Framework.Input.Touch;
+using Microsoft.Xna.Framework.Graphics.PackedVector;
+using static System.Formats.Asn1.AsnWriter;
+using System.Runtime.InteropServices;
 
 
 namespace SnakeExtreme
@@ -40,6 +43,73 @@ namespace SnakeExtreme
     public interface ILevelObject
     {
         public Point LevelPosition { get; set; }
+    }
+    public class ShineEffect : IObject, ITangible
+    {
+        private readonly AnimatedSprite shineSprite;
+        private Vector2 velocityGravity;
+        private int waitCount, waitTotal;
+        private float shineAlpha = 1;
+        public static void LoadAll(ContentManager content)
+        {
+            content.Load<SpriteSheet>($"sprite_factory/shine_0.sf", new JsonContentLoader());
+        }
+        public ShineEffect(ContentManager content)
+        {
+            {
+                var spriteSheet = content.Load<SpriteSheet>($"sprite_factory/shine_0.sf", new JsonContentLoader());
+                shineSprite = new AnimatedSprite(spriteSheet);
+                Size = (Size)spriteSheet.TextureAtlas[0].Size;
+            }
+            shineSprite.Play("shine_0");
+        }
+        public enum States { Normal, Vanish, Gone }
+        public States State { get; private set; } = States.Normal;
+        public void Vanish()
+        {
+            State = States.Vanish;
+            waitCount = 14;
+            waitTotal = 15;
+            shineAlpha = 1;
+        }
+        public Vector2 Gravity { get; set; }
+        public Vector2 Velocity { get; set; }
+        public float Scale { get; set; } = 1;
+        public float Alpha { get; set; } = 1;
+        public Vector2 Position { get; set; }
+        public Size Size { get; }
+        public int Priority { get; set; }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {
+        }
+        public void StrictUpdate()
+        {
+            float waitRatio = (float)waitCount / waitTotal;
+
+            if (State == States.Vanish)
+                shineAlpha = MathHelper.Lerp(0, 1, waitRatio);
+            else
+                shineAlpha = 1;
+
+            if (State == States.Vanish && waitCount == 0)
+                State = States.Gone;
+
+            if (waitCount > 0)
+                waitCount--;
+
+            Position += Velocity + velocityGravity;
+            velocityGravity += Gravity;
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            if (State != States.Gone)
+            {
+                shineSprite.Alpha = Alpha * shineAlpha;
+                spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+                spriteBatch.Draw(sprite: shineSprite, position: Position, rotation: 0, scale: new Vector2(Scale));
+                spriteBatch.End();
+            }
+        }
     }
     public class LightningEffect : IObject, ITangible
     {        
@@ -997,7 +1067,14 @@ namespace SnakeExtreme
         private float ballHeight = 0f;
         private const float ballMaxHeight = 32;
         private readonly List<LightningEffect> lightningEffects = new();
+        private readonly List<ShineEffect> shineEffects = new();
         private readonly static Color lightningSilhouetteColor = new Color(182, 229, 254);
+        private readonly static Color shineSilhouetteColor = new Color(69, 34, 196);
+        private readonly static List<Vector2> shinePossibleDirections = Enumerable
+            .Range(0, 8)
+            .Select(x => (x + 4) * MathHelper.TwoPi / 32)
+            .Select(x => new Vector2((float)Math.Cos(x), (float)-Math.Sin(x)))
+            .ToList();
         private void updateDrawPositions()
         {
             ballDrawPosition = truePosition + drawOffset + minBallShadowOffset + new Vector2(0, -(floatHeight + ballHeight));
@@ -1031,6 +1108,7 @@ namespace SnakeExtreme
             content.Load<SpriteSheet>($"sprite_factory/shadow_0.sf", new JsonContentLoader());
             content.Load<Effect>("effects/silhouette_0");
             LightningEffect.LoadAll(content);
+            ShineEffect.LoadAll(content);
         }
         public Ball(ContentManager content, int id)
         {
@@ -1065,11 +1143,34 @@ namespace SnakeExtreme
         public enum States 
         { 
             Normal, QuickVanish, QuickAppear, LongVanish, LongAppear, Invisible, 
-            LightningAppear, LightningNormal, LightningVanish
+            LightningAppear, LightningNormal, LightningVanish,
+            ShineAppear, ShineNormal, ShineVanish
         }
-        public enum Modes { Normal, Lightning }
         public States State { get; private set; } = States.Normal;
-        public Modes Mode { get; private set; } = Modes.Normal;
+        public void ShineAppear()
+        {
+            State = States.ShineAppear;
+            waitCount = 7;
+            waitTotal = 8;
+            shadowScale = 1;
+            ballScale = 1;
+            ballAlpha = 1;
+            ballHeight = 0;
+            silhouetteAlpha = 1;
+            silhouetteColor = shineSilhouetteColor;
+        }
+        public void ShineVanish()
+        {
+            State = States.ShineVanish;
+            waitCount = 7;
+            waitTotal = 8;
+            shadowScale = 1;
+            ballScale = 1;
+            ballAlpha = 0;
+            ballHeight = 0;
+            silhouetteAlpha = 1;
+            silhouetteColor = shineSilhouetteColor;
+        }
         public void LightningAppear()
         {
             State = States.LightningAppear;
@@ -1156,14 +1257,17 @@ namespace SnakeExtreme
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
         public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
         {
-            // Clear out any lightning effects that completed.
+            // Clear out any finished effects.
             lightningEffects.RemoveAll(x => x.State == LightningEffect.States.Gone);
+            shineEffects.RemoveAll(x => x.State == ShineEffect.States.Gone);
 
             // Perform all other game object updates.
             ballSprite.Update(gameTime);
             shadowSprite.Update(gameTime);
             foreach (var lightningEffect in lightningEffects)
                 lightningEffect.Update(gameTime, mouseState, keyboardState);
+            foreach (var shineEffect in shineEffects)
+                shineEffect.Update(gameTime, mouseState, keyboardState);
         }
         public void StrictUpdate()
         {
@@ -1186,9 +1290,9 @@ namespace SnakeExtreme
             else
                 ballScale = 1.0f;
 
-            if (State == States.LongVanish || State == States.LightningVanish)
+            if (State == States.LongVanish || State == States.LightningVanish || State == States.ShineVanish)
                 ballAlpha = MathHelper.Lerp(0, 1, waitRatio);
-            else if (State == States.LongAppear || State == States.LightningAppear)
+            else if (State == States.LongAppear || State == States.LightningAppear || State == States.ShineAppear)
                 ballAlpha = MathHelper.Lerp(1, 0, waitRatio);
             else 
                 ballAlpha = 1f;
@@ -1199,20 +1303,31 @@ namespace SnakeExtreme
                 silhouetteAlpha = MathHelper.Lerp(0, 1, waitLowRatio);
             else if (State == States.LightningAppear || State == States.LightningVanish)
                 silhouetteAlpha = waitCount % 2;
+            else if (State == States.ShineAppear || State == States.ShineVanish)
+                silhouetteAlpha = waitCount % 2;
             else if (State == States.LightningNormal)
             {
-                int waitHalf = waitTotal / 2;
-                int waitDiff = waitCount - waitHalf;
-                if (waitDiff >= waitHalf)                
-                    silhouetteAlpha = MathHelper.Lerp(1, 0, (float)waitDiff / waitHalf);                
+                int waitHalf = waitTotal / 2;                
+                if (waitCount >= waitHalf)                
+                    silhouetteAlpha = MathHelper.Lerp(1, 0, (float)(waitCount - waitHalf) / waitHalf);                
                 else                
                     silhouetteAlpha = MathHelper.Lerp(0, 1, (float)waitCount / waitHalf);                
             }
+            else if (State == States.ShineNormal)
+            {
+                int waitHalf = waitTotal / 2;                
+                if (waitCount >= waitHalf)
+                    silhouetteAlpha = MathHelper.Lerp(1f, 0, (float)(waitCount - waitHalf) / waitHalf);
+                else
+                    silhouetteAlpha = MathHelper.Lerp(0, 1f, (float)waitCount / waitHalf);
+            }
             else
-                silhouetteAlpha = 0f;
+                silhouetteAlpha = 0f;            
 
             if (State == States.LightningAppear || State == States.LightningNormal || State == States.LightningVanish)
                 silhouetteColor = lightningSilhouetteColor;
+            else if (State == States.ShineAppear || State == States.ShineNormal || State == States.ShineVanish)
+                silhouetteColor = shineSilhouetteColor;
             else
                 silhouetteColor = Color.Black;
 
@@ -1223,6 +1338,7 @@ namespace SnakeExtreme
             else
                 ballHeight = 0;
 
+            // Add effects.
             if ((State == States.LightningAppear || State == States.LightningNormal || State == States.LightningVanish) &&
                 waitCount % 15 == 0)
             {
@@ -1231,27 +1347,53 @@ namespace SnakeExtreme
                     Position = ballDrawPosition + new Vector2(
                         (random.NextSingle() - 0.5f) * Size.Width,
                         (random.NextSingle() - 0.5f) * Size.Height),
-                    Scale = 0.5f
+                    Scale = 0.75f
                 };
                 lightningEffect.Vanish();
                 lightningEffects.Add(lightningEffect);
             }
 
+            if ((State == States.ShineAppear || State == States.ShineNormal || State == States.ShineVanish) &&
+                waitCount % 15 == 0)
+            {
+                var direction = shinePossibleDirections[random.Next(shinePossibleDirections.Count)];
+                var shineEffect = new ShineEffect(content)
+                {
+                    Position = ballDrawPosition + 8 * direction,
+                    Gravity = new Vector2(0, 0.25f),
+                    Velocity = direction * 1.5f,
+                    Scale = 0.75f
+                };
+                shineEffect.Vanish();
+                shineEffects.Add(shineEffect);
+            }
+
             // Update Counters
             if (waitCount > 0)
                 waitCount--;
-            else if (State == States.LightningNormal)
+            else if (State == States.LightningNormal || State == States.ShineNormal)
                 waitCount = waitTotal - 1;
 
             // Update FSM states.
-            if ((State == States.QuickVanish || State == States.LongVanish || State == States.LightningVanish) && waitCount == 0)
+            if ((State == States.QuickVanish || State == States.LongVanish || State == States.LightningVanish || State == States.ShineVanish) && waitCount == 0)
                 State = States.Invisible;
 
             if ((State == States.QuickAppear || State == States.LongAppear) && waitCount == 0)
                 State = States.Normal;
 
             if (State == States.LightningAppear && waitCount == 0)
+            {
+                waitCount = 29;
+                waitTotal = 30;
                 State = States.LightningNormal;
+            }
+
+            if (State == States.ShineAppear && waitCount == 0)
+            {
+                waitCount = 59;
+                waitTotal = 60;
+                State = States.ShineNormal;
+            }
 
             // Update float height
             updateFloatHeight();
@@ -1259,6 +1401,9 @@ namespace SnakeExtreme
             // Since float height changes every strict update
             // need to always update draw positions.
             updateDrawPositions();
+
+            foreach (var shineEffect in shineEffects)
+                shineEffect.StrictUpdate();
         }
         public void Draw(SpriteBatch spriteBatch)
         {
@@ -1281,7 +1426,9 @@ namespace SnakeExtreme
                 spriteBatch.End();
 
                 foreach (var lightningEffect in lightningEffects)
-                    lightningEffect.Draw(spriteBatch);                
+                    lightningEffect.Draw(spriteBatch);
+                foreach (var shineEffects in shineEffects)
+                    shineEffects.Draw(spriteBatch);
             }
         }
     }
@@ -1480,7 +1627,7 @@ namespace SnakeExtreme
         private int waitTotal;
         private bool gameDestroy = false;
         private List<Point> levelCorners = new();
-        private List<Point> levelPossiblePositions = new();     
+        private List<Point> levelPossiblePositions = new();        
         private Point getRandomLevelPosition(IEnumerable<Point> additionalPositions = null)
         {
             if (additionalPositions == null)
