@@ -19,11 +19,6 @@ using MonoGame.Extended;
 using System.Collections.ObjectModel;
 using MonoGame.Extended.BitmapFonts;
 using System.Text;
-using Microsoft.Extensions.Primitives;
-using Microsoft.Xna.Framework.Input.Touch;
-using Microsoft.Xna.Framework.Graphics.PackedVector;
-using static System.Formats.Asn1.AsnWriter;
-using System.Runtime.InteropServices;
 
 
 namespace SnakeExtreme
@@ -801,6 +796,66 @@ namespace SnakeExtreme
             spriteBatch.End();
         }
     }
+    public class ShineFood : IObject, ITangible, ILevelObject
+    {
+        private readonly Ball ball;
+        private Point trueLevelPosition;
+        public ShineFood(ContentManager content)
+        {
+            ball = new Ball(content, 4);
+            ball.ShineAppear();
+            State = States.Appear;
+        }
+        public enum States { Appear, Normal, Vanish, Gone }
+        public States State { get; private set; }
+        public void Vanish()
+        {
+            Debug.Assert(State == States.Normal);
+            ball.ShineVanish();
+            State = States.Vanish;
+        }
+        public Vector2 Position
+        {
+            get => ball.Position;
+            set => throw new NotImplementedException();
+        }
+        public Size Size
+        {
+            get => ball.Size;
+        }
+        public int Priority
+        {
+            get => ball.Priority;
+            set => throw new NotImplementedException();
+        }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        {
+            if (State == States.Appear && ball.State == Ball.States.ShineNormal)
+                State = States.Normal;
+
+            if (State == States.Vanish && ball.State == Ball.States.Invisible)
+                State = States.Gone;
+
+            ball.Update(gameTime, mouseState, keyboardState);
+        }
+        public void StrictUpdate()
+        {
+            ball.StrictUpdate();
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            ball.Draw(spriteBatch);
+        }
+        public Point LevelPosition
+        {
+            get => trueLevelPosition;
+            set
+            {
+                trueLevelPosition = value;
+                ball.Position = new Vector2(trueLevelPosition.X * Size.Width, trueLevelPosition.Y * Size.Height);
+            }
+        }
+    }
     public class Food : IObject, ITangible, ILevelObject
     {
         private readonly Ball ball;
@@ -878,9 +933,11 @@ namespace SnakeExtreme
             { Directions.Left, new Point(-1, 0) },
             { Directions.Right, new Point(1, 0) },
         });
+        public enum Modes { Normal, Shine }
         public enum Directions { Up, Down, Left, Right }
         public enum States { Normal, Appear, Move, Vanish, Gone }
         public States State { get; private set; } = States.Normal;
+        public Modes Mode { get; set; } = Modes.Normal;
         public Directions Direction 
         {
             get => trueDirection;
@@ -913,24 +970,32 @@ namespace SnakeExtreme
         {
             Debug.Assert(Headless);            
             bodies.Add(new SnakeBody(content) { LevelPosition = startLevelPosition });
-            Head.LongAppear();
+            if (Mode == Modes.Normal)
+                Head.LongAppear();
+            else if (Mode == Modes.Shine)
+                Head.ShineAppear();
             State = States.Appear;
         }
         public void Move(bool growTail = false)
         {
             Debug.Assert(!Headless);
             Debug.Assert(State == States.Normal);
-            Debug.Assert(bodies.All(x => x.State == Ball.States.Normal));
+            Debug.Assert(bodies.All(x => x.State == Ball.States.Normal || x.State == Ball.States.ShineNormal));
             this.growTail = growTail;
             foreach (var body in bodies)
-                body.QuickVanish();
+            {
+                if (Mode == Modes.Normal)
+                    body.QuickVanish();
+                else if (Mode == Modes.Shine)
+                    body.ShineVanish();
+            }
             State = States.Move;
         }
         public void Vanish()
         {
             Debug.Assert(!Headless);
             Debug.Assert(State == States.Normal);
-            Debug.Assert(bodies.All(x => x.State == Ball.States.Normal));
+            Debug.Assert(bodies.All(x => x.State == Ball.States.Normal || x.State == Ball.States.ShineNormal));
             foreach (var body in bodies)
                 body.LongVanish();
             State = States.Vanish;
@@ -964,12 +1029,18 @@ namespace SnakeExtreme
                         bodies[i].LevelPosition = bodies[i - 1].LevelPosition;
                     if (growTail && i == bodies.Count - 1)
                     {
-                        bodies[i].LongAppear();
+                        if (Mode == Modes.Normal)
+                            bodies[i].LongAppear();
+                        else if (Mode == Modes.Shine)
+                            bodies[i].ShineAppear();
                         bodies[i].UpdateFloatHeight(bodies[i - 1]);
                     }
                     else
                     {
-                        bodies[i].QuickAppear();
+                        if (Mode == Modes.Normal)
+                            bodies[i].QuickAppear();
+                        else if (Mode == Modes.Shine)
+                            bodies[i].ShineAppear();                        
                     }
                 }
             }
@@ -977,7 +1048,8 @@ namespace SnakeExtreme
             {
                 NewTailAvailable = false;
             }
-            if ((State == States.Move || State == States.Appear) && bodies.All(x=>x.State == Ball.States.Normal))
+            if ((State == States.Move || State == States.Appear) && 
+                bodies.All(x=>x.State == Ball.States.Normal || x.State == Ball.States.ShineNormal))
             {
                 State = States.Normal;
             }
@@ -990,7 +1062,7 @@ namespace SnakeExtreme
         {            
         }
         public void Draw(SpriteBatch spriteBatch)
-        {            
+        {                
         }
     }
     public class SnakeBody : IObject, ITangible, ILevelObject
@@ -1003,6 +1075,8 @@ namespace SnakeExtreme
             ball = new Ball(content, ballId);
         }
         public Ball.States State { get => ball.State; }
+        public void ShineAppear() => ball.ShineAppear();
+        public void ShineVanish() => ball.ShineVanish();
         public void QuickVanish() => ball.QuickVanish();
         public void QuickAppear() => ball.QuickAppear();
         public void LongAppear() => ball.LongAppear();
@@ -1059,6 +1133,8 @@ namespace SnakeExtreme
         private bool floatUpDirection = true;
         private int waitCount;
         private int waitTotal = 1;
+        private int effectCount;
+        private int effectTotal = 1;
         private float shadowScale = 1.0f;
         private const float shadowAlpha = 0.5f;
         private float ballScale = 1.0f;
@@ -1150,8 +1226,9 @@ namespace SnakeExtreme
         public void ShineAppear()
         {
             State = States.ShineAppear;
-            waitCount = 7;
-            waitTotal = 8;
+            waitCount = 3;
+            waitTotal = 4;            
+            effectTotal = 30;
             shadowScale = 1;
             ballScale = 1;
             ballAlpha = 1;
@@ -1162,8 +1239,9 @@ namespace SnakeExtreme
         public void ShineVanish()
         {
             State = States.ShineVanish;
-            waitCount = 7;
-            waitTotal = 8;
+            waitCount = 3;
+            waitTotal = 4;
+            effectTotal = 30;
             shadowScale = 1;
             ballScale = 1;
             ballAlpha = 0;
@@ -1175,7 +1253,8 @@ namespace SnakeExtreme
         {
             State = States.LightningAppear;
             waitCount = 7;
-            waitTotal = 8;
+            waitTotal = 8;            
+            effectTotal = 30;
             shadowScale = 1;
             ballScale = 1;
             ballAlpha = 1;
@@ -1188,6 +1267,7 @@ namespace SnakeExtreme
             State = States.LightningVanish;
             waitCount = 7;
             waitTotal = 8;
+            effectTotal = 30;
             shadowScale = 1;
             ballScale = 1;
             ballAlpha = 0;
@@ -1340,7 +1420,7 @@ namespace SnakeExtreme
 
             // Add effects.
             if ((State == States.LightningAppear || State == States.LightningNormal || State == States.LightningVanish) &&
-                waitCount % 15 == 0)
+                effectCount % 15 == 0)
             {
                 var lightningEffect = new LightningEffect(content)
                 {
@@ -1354,7 +1434,7 @@ namespace SnakeExtreme
             }
 
             if ((State == States.ShineAppear || State == States.ShineNormal || State == States.ShineVanish) &&
-                waitCount % 15 == 0)
+                effectCount % 15 == 0)
             {
                 var direction = shinePossibleDirections[random.Next(shinePossibleDirections.Count)];
                 var shineEffect = new ShineEffect(content)
@@ -1362,7 +1442,7 @@ namespace SnakeExtreme
                     Position = ballDrawPosition + 8 * direction,
                     Gravity = new Vector2(0, 0.25f),
                     Velocity = direction * 1.5f,
-                    Scale = 0.75f
+                    Scale = 0.75f + (random.NextSingle() -0.5f) * 0.15f
                 };
                 shineEffect.Vanish();
                 shineEffects.Add(shineEffect);
@@ -1373,6 +1453,12 @@ namespace SnakeExtreme
                 waitCount--;
             else if (State == States.LightningNormal || State == States.ShineNormal)
                 waitCount = waitTotal - 1;
+
+            if (effectCount > 0)
+                effectCount--;
+            else if (State == States.LightningAppear || State == States.LightningNormal || State == States.LightningVanish ||
+                     State == States.ShineAppear || State == States.ShineNormal || State == States.ShineVanish)
+                effectCount = effectTotal - 1;
 
             // Update FSM states.
             if ((State == States.QuickVanish || State == States.LongVanish || State == States.LightningVanish || State == States.ShineVanish) && waitCount == 0)
@@ -1595,6 +1681,7 @@ namespace SnakeExtreme
         {
             public LightningObstacle obstacle;
             public int turnWait;
+            public bool removedByShine;
         }
         private readonly static Random random = new Random();
         private GraphicsDeviceManager graphics;        
@@ -1607,11 +1694,16 @@ namespace SnakeExtreme
         private Food food, newFood;
         private List<Obstacle> obstacles = new();
         private List<LightningObject> lightningObjects = new();
+        private List<ShineFood> shineFoods = new();
+        private Obstacle removeObstacle;
+        private LightningObject removeLightningObject;
+        private ShineFood removeShineFood;
         private Panel currentScorePanel, highScorePanel;
         private Dimmer dimmer;
         private Board board;
         private AnyKey anyKey;
         private Sound moveSound, foodSound, destroySound, pauseSound, obstacleSound;
+        private Sound shineFoodAppearSound, shineFoodPickUpSound, shineFoodRemoveObstacle;
         private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;
@@ -1623,6 +1715,8 @@ namespace SnakeExtreme
         private const int lightningStartThreshold = 2 * scorePerLevelUpdate;
         private const int lightningPerLevelUpdate = 2;
         private const int lightningActiveTurns = 5;
+        private const int shineStartThreshold = 3 * scorePerLevelUpdate;
+        private const int shineMaxAmount = 2;
         private int waitCount;
         private int waitTotal;
         private bool gameDestroy = false;
@@ -1639,7 +1733,7 @@ namespace SnakeExtreme
         {
             foreach (var obj in lightningObjects)
             {
-                if (obj.turnWait == 0)
+                if (obj.turnWait == 0 && !obj.removedByShine)
                 {
                     if (obj.obstacle.State == LightningObstacle.States.Normal)
                     {
@@ -1666,10 +1760,12 @@ namespace SnakeExtreme
         }
         public enum FoodStates { Normal, NewFood }
         public enum GameStates { Start, Create, Wait, Action, Destroy }
+        public enum ShineStates { Normal, NewShine, RemoveObstacle }
         public enum PauseStates { Resumed, Pause, Paused, Resume }
         public GameStates GameState { get; private set; } = GameStates.Start;
         public FoodStates FoodState { get; private set; } = FoodStates.Normal;
         public PauseStates PauseState { get; private set; } = PauseStates.Resumed;
+        public ShineStates ShineState { get; private set; } = ShineStates.Normal;
 
         /// <summary>
         /// Allows the game to perform any initialization it needs to before starting to run.
@@ -1836,7 +1932,10 @@ namespace SnakeExtreme
             foodSound = new Sound(Content, "sounds/food_0");
             destroySound = new Sound(Content, "sounds/destroy_0");
             pauseSound = new Sound(Content, "sounds/pause_0");
-            obstacleSound = new Sound(Content, "sounds/obstacle_0");
+            obstacleSound = new Sound(Content, "sounds/obstacle_0");            
+            shineFoodPickUpSound = new Sound(Content, "sounds/shine_food_0");
+            shineFoodAppearSound = new Sound(Content, "sounds/shine_food_1");
+            shineFoodRemoveObstacle = new Sound(Content, "sounds/shine_food_2");
 
             snake = new Snake(Content);
             gameObjects.Add(snake);
@@ -1885,6 +1984,7 @@ namespace SnakeExtreme
                     {
                         Debug.Assert(snake.Headless);
                         Debug.Assert(food == null);
+                        Console.WriteLine($"Game Objects: {gameObjects.Count}");
 
                         var startLevelPosition = new Point(
                             (int)levelCorners.Select(x => x.X).Average(),
@@ -1953,25 +2053,30 @@ namespace SnakeExtreme
                 var minX = levelCorners.Select(x => x.X).Min();
                 var maxX = levelCorners.Select(x => x.X).Max();
                 var minY = levelCorners.Select(x => x.Y).Min();
-                var maxY = levelCorners.Select(x => x.Y).Max();                
+                var maxY = levelCorners.Select(x => x.Y).Max();
+
+                var aboutToCollideWithObstacle = 
+                    obstacles.Any(x => x.LevelPosition == snakeNextLevelPosition) ||
+                    lightningObjects.Any(x => (x.obstacle.State == LightningObstacle.States.Normal && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait != 0) ||
+                                              (x.obstacle.State == LightningObstacle.States.Gone && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait == 0));
 
                 if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
                     snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY ||
                     snake.Bodies.Any(x=> x.LevelPosition == snakeNextLevelPosition && x != snake.Tail) ||
-                    obstacles.Any(x => x.LevelPosition == snakeNextLevelPosition) ||  
-                    lightningObjects.Any(x => (x.obstacle.State == LightningObstacle.States.Normal && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait != 0) ||
-                                              (x.obstacle.State == LightningObstacle.States.Gone && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait == 0)) ||
+                    (aboutToCollideWithObstacle && snake.Mode == Snake.Modes.Normal) ||
                     gameDestroy)
                 {
                     gameDestroy = false;
 
                     snake.Vanish();
                     food.Vanish();
+                    foreach (var food in shineFoods)
+                        food.Vanish();
                     foreach (var obstacle in obstacles)
                         obstacle.Vanish();
                     foreach (var x in lightningObjects)                    
                         if (x.obstacle.State == LightningObstacle.States.Normal)
-                            x.obstacle.Vanish();                    
+                            x.obstacle.Vanish();
 
                     if (currentScorePanel.Value > highScorePanel.Value)
                     {
@@ -2000,9 +2105,12 @@ namespace SnakeExtreme
                     currentScorePanel.Value += 1;
                     currentScorePanel.Flash();
 
-                    // Time to generate some hazards.
+                    // Time to generate interactable spheres.
                     if (currentScorePanel.Value % scorePerLevelUpdate == 0)
                     {
+                        var obstacleCreated = false;
+                        var shineFoodCreated = false;
+
                         // Generate obstacle.
                         if (currentScorePanel.Value >= obstacleStartThreshold &&                            
                             (int)(levelPossiblePositions.Count * 0.25f) >= obstacles.Count)
@@ -2012,7 +2120,8 @@ namespace SnakeExtreme
                                 var obstacle = new Obstacle(Content) { LevelPosition = getRandomLevelPosition([snakeNextLevelPosition]) };
                                 obstacles.Add(obstacle);
                                 gameObjects.Add(obstacle);
-                            }                            
+                            }
+                            obstacleCreated = true;
                         }
 
                         // Generate lightning obstacle.
@@ -2024,15 +2133,31 @@ namespace SnakeExtreme
                                 var obj = new LightningObject()
                                 {
                                     obstacle = new LightningObstacle(Content) { LevelPosition = getRandomLevelPosition([snakeNextLevelPosition]) },
-                                    turnWait = lightningActiveTurns
+                                    turnWait = lightningActiveTurns,
+                                    removedByShine = false
                                 };
                                 lightningObjects.Add(obj);
                                 gameObjects.Add(obj.obstacle);
                             }
+                            obstacleCreated = true;
                         }
 
-                        obstacleSound.Play();
-                    }
+                        // Generate shine food.
+                        if (currentScorePanel.Value >= shineStartThreshold &&
+                            shineFoods.Count < shineMaxAmount)
+                        {
+                            var shineFood = new ShineFood(Content) { LevelPosition = getRandomLevelPosition([snakeNextLevelPosition]) };
+                            shineFoods.Add(shineFood);
+                            gameObjects.Add(shineFood);
+                            shineFoodCreated = true;
+                        }
+
+                        // Play sounds if conditions were met.
+                        if (obstacleCreated)
+                            obstacleSound.Play();
+                        if (shineFoodCreated)
+                            shineFoodAppearSound.Play();
+                    }                    
 
                     updateLightningObjects();
 
@@ -2041,9 +2166,49 @@ namespace SnakeExtreme
                     GameState = GameStates.Action;
                 }
                 else
-                {                    
-                    snake.Move(growTail: false);
+                {
+                    Debug.Assert(removeShineFood == null);
+                    removeShineFood = shineFoods.Where(x => x.LevelPosition == snakeNextLevelPosition).FirstOrDefault();
 
+                    if (aboutToCollideWithObstacle && snake.Mode == Snake.Modes.Shine)
+                    {
+                        Debug.Assert(removeObstacle == null);
+                        Debug.Assert(removeLightningObject == null);
+                        removeObstacle = obstacles.Where(x => x.LevelPosition == snakeNextLevelPosition).FirstOrDefault();
+                        removeLightningObject = lightningObjects.Where(x => x.obstacle.LevelPosition == snakeNextLevelPosition).FirstOrDefault();
+                        Debug.Assert((removeObstacle != null ? 1 : 0) + (removeLightningObject != null ? 1 : 0) == 1);
+                        
+                        if (removeObstacle != null)
+                        {
+                            removeObstacle.Vanish();
+                        }
+                        else if (removeLightningObject != null)
+                        {
+                            removeLightningObject.removedByShine = true;
+                            if (removeLightningObject.obstacle.State == LightningObstacle.States.Normal)
+                                removeLightningObject.obstacle.Vanish();
+                        }
+
+                        shineFoodRemoveObstacle.Play();
+
+                        snake.Mode = Snake.Modes.Normal;
+                        ShineState = ShineStates.RemoveObstacle;
+                    }
+                    else if (removeShineFood != null)
+                    {
+                        removeShineFood.Vanish();
+
+                        shineFoodPickUpSound.Play();
+
+                        snake.Mode = Snake.Modes.Shine;
+                        ShineState = ShineStates.NewShine;
+                    }
+                    else
+                    {
+                        ShineState = ShineStates.Normal;
+                    }
+
+                    snake.Move(growTail: false);
                     moveSound.Play(randomPitch: true);
 
                     updateLightningObjects();
@@ -2053,10 +2218,44 @@ namespace SnakeExtreme
                 }                 
             }
 
-            if (PauseState == PauseStates.Resumed && GameState == GameStates.Action && 
+            if (PauseState == PauseStates.Resumed &&
+                GameState == GameStates.Action &&
+                FoodState == FoodStates.Normal)
+            {
+                if (ShineState == ShineStates.RemoveObstacle)
+                {
+                    if (removeObstacle != null && removeObstacle.State == Obstacle.States.Gone)
+                    {
+                        obstacles.Remove(removeObstacle);
+                        gameObjects.Remove(removeObstacle);
+                        removeObstacle = null;
+                        ShineState = ShineStates.Normal;
+                    }
+                    else if (removeLightningObject != null && removeLightningObject.obstacle.State == LightningObstacle.States.Gone)
+                    {
+                        Debug.Assert(removeLightningObject.removedByShine);
+                        lightningObjects.Remove(removeLightningObject);
+                        gameObjects.Remove(removeLightningObject.obstacle);
+                        removeLightningObject = null;
+                        ShineState = ShineStates.Normal;
+                    }                    
+                }
+                else if (ShineState == ShineStates.NewShine && removeShineFood.State == ShineFood.States.Gone)
+                {
+                    shineFoods.Remove(removeShineFood);
+                    gameObjects.Remove(removeShineFood);
+                    removeShineFood = null;
+                    ShineState = ShineStates.Normal;
+                }
+            }
+
+            if (PauseState == PauseStates.Resumed && 
+                GameState == GameStates.Action &&
+                ShineState == ShineStates.Normal &&
                 snake.State == Snake.States.Normal && 
                 obstacles.All(x => x.State == Obstacle.States.Normal) &&
-                lightningObjects.All(x => x.obstacle.State == LightningObstacle.States.Normal || x.obstacle.State == LightningObstacle.States.Gone))
+                lightningObjects.All(x => x.obstacle.State == LightningObstacle.States.Normal || (x.obstacle.State == LightningObstacle.States.Gone)) &&
+                shineFoods.All(x => x.State == ShineFood.States.Normal))
             {
                 if (FoodState == FoodStates.NewFood && food.State == Food.States.Gone && newFood.State == Food.States.Normal)
                 {
@@ -2089,9 +2288,14 @@ namespace SnakeExtreme
                 foreach (var body in snake.Bodies)
                     gameObjects.Remove(body);
                 snake.Clear();
+                snake.Mode = Snake.Modes.Normal;
 
                 gameObjects.Remove(food);
                 food = null;
+
+                foreach (var food in shineFoods)
+                    gameObjects.Remove(food);
+                shineFoods.Clear();
 
                 foreach (var obstacle in obstacles)
                     gameObjects.Remove(obstacle);

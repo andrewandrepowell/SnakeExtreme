@@ -314,3 +314,21 @@
 /processorParam:TextureFormat=Color
 /build:sprite_factory/shine_0.png
 
+#begin sounds/shine_food_0.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/shine_food_0.wav
+
+#begin sounds/shine_food_1.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/shine_food_1.wav
+
+#begin sounds/shine_food_2.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/shine_food_2.wav
+
