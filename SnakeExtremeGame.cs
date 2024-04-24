@@ -19,6 +19,8 @@ using MonoGame.Extended;
 using System.Collections.ObjectModel;
 using MonoGame.Extended.BitmapFonts;
 using System.Text;
+using Microsoft.Xna.Framework.Input.Touch;
+using Microsoft.JSInterop;
 
 
 namespace SnakeExtreme
@@ -38,6 +40,84 @@ namespace SnakeExtreme
     public interface ILevelObject
     {
         public Point LevelPosition { get; set; }
+    }
+    public class CenterScreen
+    {
+        private readonly GraphicsDevice graphicsDevice;
+        private readonly Size screenDimensions;
+        private readonly RenderTarget2D renderTarget;        
+        public CenterScreen(GraphicsDevice graphicsDevice, Size screenDimensions)
+        {
+            this.graphicsDevice = graphicsDevice;
+            this.screenDimensions = screenDimensions;
+            Scalar = 1;
+            Offset = Vector2.Zero;
+            Size = screenDimensions;
+            renderTarget = new RenderTarget2D(graphicsDevice, screenDimensions.Width, screenDimensions.Height);
+        }
+        public void BeginCapture()
+        {
+            graphicsDevice.SetRenderTarget(renderTarget);
+        }
+        public void EndCapture()
+        {
+            graphicsDevice.SetRenderTarget(null);
+        }
+        public MouseState UpdateMouseState(MouseState mouseState)
+        {
+            var newMouseState = new MouseState(
+                x: (int)((mouseState.X - Offset.X) / Scalar),
+                y: (int)((mouseState.Y - Offset.Y) / Scalar),
+                scrollWheel: mouseState.ScrollWheelValue,
+                leftButton: mouseState.LeftButton,
+                middleButton: mouseState.MiddleButton,
+                rightButton: mouseState.RightButton,
+                xButton1: mouseState.XButton1,
+                xButton2: mouseState.XButton2);
+            return newMouseState;
+        }
+        public float Scalar { get; private set; }
+        public Vector2 Offset { get; private set; }
+        public Size Size { get; private set; }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            spriteBatch.Begin();
+            spriteBatch.Draw(
+                texture: renderTarget, 
+                position: Offset, 
+                sourceRectangle: null, 
+                color: Color.White, 
+                rotation: 0, 
+                origin: Vector2.Zero, 
+                scale: Scalar, 
+                effects: SpriteEffects.None, 
+                layerDepth: 0);
+            spriteBatch.End();
+        }
+        public void Update()
+        {
+            if (BrowserServer.DimensionsUpdated)
+            {
+                {
+                    var widthScalar = (float)BrowserServer.Dimensions.Width / screenDimensions.Width;
+                    var heightScalar = (float)BrowserServer.Dimensions.Height / screenDimensions.Height;
+                    if (screenDimensions.Height * widthScalar > BrowserServer.Dimensions.Height)
+                        Scalar = heightScalar;
+                    else
+                        Scalar = widthScalar;
+                }
+                {
+                    var newWidth = (int)Math.Ceiling(Scalar * screenDimensions.Width);
+                    var newHeight = (int)Math.Ceiling(Scalar * screenDimensions.Height);
+                    Size = new Size(newWidth, newHeight);
+                }
+                {
+                    var newXOffset = (BrowserServer.Dimensions.Width - Size.Width) / 2;
+                    var newYOffset = (BrowserServer.Dimensions.Height - Size.Height) / 2;
+                    Offset = new Vector2(newXOffset, newYOffset);
+                }                
+            }
+        }
     }
     public class ShineEffect : IObject, ITangible
     {
@@ -1718,7 +1798,8 @@ namespace SnakeExtreme
         private int waitTotal;
         private bool gameDestroy = false;
         private List<Point> levelCorners = new();
-        private List<Point> levelPossiblePositions = new();        
+        private List<Point> levelPossiblePositions = new();
+        private CenterScreen centerScreen;
         private Point getRandomLevelPosition(IEnumerable<Point> additionalPositions = null)
         {
             if (additionalPositions == null)
@@ -1937,6 +2018,8 @@ namespace SnakeExtreme
             snake = new Snake(Content);
             gameObjects.Add(snake);
 
+            centerScreen = new CenterScreen(GraphicsDevice, new Size(levelTiledMap.WidthInPixels, levelTiledMap.HeightInPixels));
+
             dimmer.Dim();
             board.Open();
             PauseState = PauseStates.Pause;
@@ -1958,8 +2041,8 @@ namespace SnakeExtreme
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Update(GameTime gameTime)
         {
-            MouseState mouseState = Mouse.GetState();
-            KeyboardState keyboardState = Keyboard.GetState();
+            MouseState mouseState = centerScreen.UpdateMouseState(Mouse.GetState());
+            KeyboardState keyboardState = Keyboard.GetState();           
 
             // TODO: Add your update logic here
 
@@ -2308,6 +2391,9 @@ namespace SnakeExtreme
             if (snake.NewTailAvailable)
                 gameObjects.Add(snake.Tail);
 
+            // Update center screen
+            centerScreen.Update();
+
             // Perform level and game object updates.
             {
                 levelTiledMapRenderer.Update(gameTime);
@@ -2337,13 +2423,18 @@ namespace SnakeExtreme
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Draw(GameTime gameTime)
         {
-            GraphicsDevice.Clear(Color.Black);
-
             // TODO: Add your drawing code here
+            centerScreen.BeginCapture();
+            GraphicsDevice.Clear(Color.Black);
             GraphicsDevice.BlendState = BlendState.AlphaBlend;
             levelTiledMapRenderer.Draw();
             foreach (var gameObject in gameObjects.OrderBy(x => x.Priority))
-                gameObject.Draw(spriteBatch);
+                gameObject.Draw(spriteBatch);            
+            centerScreen.EndCapture();
+
+            GraphicsDevice.Clear(Color.Black);
+            centerScreen.Draw(spriteBatch);
+
             base.Draw(gameTime);
         }
     }
