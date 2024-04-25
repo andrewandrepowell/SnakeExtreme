@@ -28,7 +28,7 @@ namespace SnakeExtreme
     public interface IObject
     {
         public int Priority { get; set; }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState);
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState);
         public void StrictUpdate();
         public void Draw(SpriteBatch spriteBatch);
     }
@@ -76,6 +76,12 @@ namespace SnakeExtreme
                 xButton2: mouseState.XButton2);
             return newMouseState;
         }
+        public Vector2 UpdateTouchState(Vector2 touchState)
+        {
+            return new Vector2(
+                x: (touchState.X - Offset.X) / Scalar,
+                y: (touchState.Y - Offset.Y) / Scalar);
+        }
         public float Scalar { get; private set; }
         public Vector2 Offset { get; private set; }
         public Size Size { get; private set; }
@@ -96,12 +102,12 @@ namespace SnakeExtreme
         }
         public void Update()
         {
-            if (BrowserServer.DimensionsUpdated)
+            if (BrowserService.DimensionsUpdated)
             {
                 {
-                    var widthScalar = (float)BrowserServer.Dimensions.Width / screenDimensions.Width;
-                    var heightScalar = (float)BrowserServer.Dimensions.Height / screenDimensions.Height;
-                    if (screenDimensions.Height * widthScalar > BrowserServer.Dimensions.Height)
+                    var widthScalar = (float)BrowserService.Dimensions.Width / screenDimensions.Width;
+                    var heightScalar = (float)BrowserService.Dimensions.Height / screenDimensions.Height;
+                    if (screenDimensions.Height * widthScalar > BrowserService.Dimensions.Height)
                         Scalar = heightScalar;
                     else
                         Scalar = widthScalar;
@@ -112,8 +118,8 @@ namespace SnakeExtreme
                     Size = new Size(newWidth, newHeight);
                 }
                 {
-                    var newXOffset = (BrowserServer.Dimensions.Width - Size.Width) / 2;
-                    var newYOffset = (BrowserServer.Dimensions.Height - Size.Height) / 2;
+                    var newXOffset = (BrowserService.Dimensions.Width - Size.Width) / 2;
+                    var newYOffset = (BrowserService.Dimensions.Height - Size.Height) / 2;
                     Offset = new Vector2(newXOffset, newYOffset);
                 }                
             }
@@ -154,7 +160,7 @@ namespace SnakeExtreme
         public Vector2 Position { get; set; }
         public Size Size { get; }
         public int Priority { get; set; }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
         }
         public void StrictUpdate()
@@ -228,7 +234,7 @@ namespace SnakeExtreme
         public Vector2 Position { get; set; }
         public Size Size { get; }
         public int Priority { get; set; }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             if (State == States.Vanish && currentSpriteSheetAnimation.IsComplete)
                 State = States.Gone;
@@ -284,7 +290,7 @@ namespace SnakeExtreme
             get => ball.Priority;
             set => throw new NotImplementedException();
         }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             if (State == States.Appear && ball.State == Ball.States.LightningNormal)
                 State = States.Normal;
@@ -292,7 +298,7 @@ namespace SnakeExtreme
             if (State == States.Vanish && ball.State == Ball.States.Invisible)
                 State = States.Gone;
 
-            ball.Update(gameTime, mouseState, keyboardState);
+            ball.Update(gameTime, mouseState, keyboardState, touchState);
         }
         public void StrictUpdate()
         {
@@ -344,7 +350,7 @@ namespace SnakeExtreme
             get => ball.Priority;
             set => throw new NotImplementedException();
         }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             if (State == States.Appear && ball.State == Ball.States.Normal)
                 State = States.Normal;
@@ -352,7 +358,7 @@ namespace SnakeExtreme
             if (State == States.Vanish && ball.State == Ball.States.Invisible)
                 State = States.Gone;
 
-            ball.Update(gameTime, mouseState, keyboardState);
+            ball.Update(gameTime, mouseState, keyboardState, touchState);
         }
         public void StrictUpdate()
         {
@@ -583,7 +589,7 @@ namespace SnakeExtreme
         }
         public Size Size { get; }
         public int Priority { get; set; }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             panelSprite.Update(gameTime);
         }
@@ -647,11 +653,12 @@ namespace SnakeExtreme
         public bool Pressed { get; private set; } = false;
         public bool Released { get; private set; } = false;
         public int Priority { get => 0; set => throw new NotImplementedException(); }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             if (!Selected && (mouseState.LeftButton == ButtonState.Pressed ||
                 mouseState.RightButton == ButtonState.Pressed ||
-                keyboardState.GetPressedKeyCount() > 0))
+                keyboardState.GetPressedKeyCount() > 0 ||
+                touchState.HasValue))
             {
                 Selected = true;
                 Pressed = true;
@@ -667,7 +674,8 @@ namespace SnakeExtreme
             }
             if (Selected && (mouseState.LeftButton != ButtonState.Pressed &&
                 mouseState.RightButton != ButtonState.Pressed &&
-                keyboardState.GetPressedKeyCount() == 0))
+                keyboardState.GetPressedKeyCount() == 0 &&
+                !touchState.HasValue))
             {
                 Selected = false;
                 Released = true;
@@ -728,7 +736,7 @@ namespace SnakeExtreme
         public Vector2 Position { get; set; }
         public Size Size { get; }
         public int Priority { get; set; }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {            
         }
         public void StrictUpdate()
@@ -834,7 +842,7 @@ namespace SnakeExtreme
         }
         public Size Size { get; }
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             panelSprite.Update(gameTime);
             messageSprite.Update(gameTime);
@@ -908,7 +916,7 @@ namespace SnakeExtreme
             get => ball.Priority;
             set => throw new NotImplementedException();
         }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             if (State == States.Appear && ball.State == Ball.States.ShineNormal)
                 State = States.Normal;
@@ -916,7 +924,7 @@ namespace SnakeExtreme
             if (State == States.Vanish && ball.State == Ball.States.Invisible)
                 State = States.Gone;
 
-            ball.Update(gameTime, mouseState, keyboardState);
+            ball.Update(gameTime, mouseState, keyboardState, touchState);
         }
         public void StrictUpdate()
         {
@@ -968,7 +976,7 @@ namespace SnakeExtreme
             get => ball.Priority;
             set => throw new NotImplementedException();
         }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             if (State == States.Appear && ball.State == Ball.States.Normal)            
                 State = States.Normal;
@@ -976,7 +984,7 @@ namespace SnakeExtreme
             if (State == States.Vanish && ball.State == Ball.States.Invisible)
                 State = States.Gone;
 
-            ball.Update(gameTime, mouseState, keyboardState);
+            ball.Update(gameTime, mouseState, keyboardState, touchState);
         }
         public void StrictUpdate()
         {
@@ -1091,7 +1099,7 @@ namespace SnakeExtreme
         }
         public Size Size { get => Head.Size; }
         public int Priority { get => (Headless ? 0 : (int)Position.Y); set => throw new NotImplementedException(); }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             if (State == States.Move && bodies.All(x=>x.State == Ball.States.Invisible))
             {
@@ -1160,9 +1168,9 @@ namespace SnakeExtreme
         public void LongVanish() => ball.LongVanish();
         public void UpdateFloatHeight(SnakeBody body) => ball.UpdateFloatHeight(body.ball);
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {            
-            ball.Update(gameTime, mouseState, keyboardState);
+            ball.Update(gameTime, mouseState, keyboardState, touchState);
         }
         public void StrictUpdate()
         {
@@ -1412,7 +1420,7 @@ namespace SnakeExtreme
         }
         public Size Size { get => size; }
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
             // Clear out any finished effects.
             lightningEffects.RemoveAll(x => x.State == LightningEffect.States.Gone);
@@ -1422,9 +1430,9 @@ namespace SnakeExtreme
             ballSprite.Update(gameTime);
             shadowSprite.Update(gameTime);
             foreach (var lightningEffect in lightningEffects)
-                lightningEffect.Update(gameTime, mouseState, keyboardState);
+                lightningEffect.Update(gameTime, mouseState, keyboardState, touchState);
             foreach (var shineEffect in shineEffects)
-                shineEffect.Update(gameTime, mouseState, keyboardState);
+                shineEffect.Update(gameTime, mouseState, keyboardState, touchState);
         }
         public void StrictUpdate()
         {
@@ -1621,7 +1629,7 @@ namespace SnakeExtreme
         public Vector2 Position { get; set; }
         public Size Size { get => size; }
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {            
             torchSprite.Update(gameTime);
             shadowSprite.Update(gameTime);
@@ -1702,13 +1710,16 @@ namespace SnakeExtreme
         public Vector2 Position { get; set; }
         public Size Size { get; }
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
-        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState)
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {            
             if (!Selected && ((
                 mouseState.LeftButton == ButtonState.Pressed && 
                 mouseState.Position.X >= Position.X && mouseState.X < (Position.X + Size.Width) &&
                 mouseState.Position.Y >= Position.Y && mouseState.Y < (Position.Y + Size.Height)) || (
-                keyboardState.IsKeyDown(keyMap[Mode]))))
+                keyboardState.IsKeyDown(keyMap[Mode])) || (
+                touchState.HasValue &&
+                touchState.Value.X >= Position.X && touchState.Value.X < (Position.X + Size.Width) &&
+                touchState.Value.Y >= Position.Y && touchState.Value.Y < (Position.Y + Size.Height))))
             {
                 visualSprite.Play("selected_0");
                 Selected = true;
@@ -1721,7 +1732,8 @@ namespace SnakeExtreme
 
             if (Selected && ((
                 mouseState.LeftButton != ButtonState.Pressed) && 
-                keyboardState.IsKeyUp(keyMap[Mode])))
+                keyboardState.IsKeyUp(keyMap[Mode]) &&
+                !touchState.HasValue))
             {
                 visualSprite.Play("unselected_0");
                 Selected = false;
@@ -2042,7 +2054,9 @@ namespace SnakeExtreme
         protected override void Update(GameTime gameTime)
         {
             MouseState mouseState = centerScreen.UpdateMouseState(Mouse.GetState());
-            KeyboardState keyboardState = Keyboard.GetState();           
+            KeyboardState keyboardState = Keyboard.GetState();
+            Vector2? touchState = (BrowserService.Touches.Count > 0 ?
+                centerScreen.UpdateTouchState(BrowserService.Touches.Dequeue()) : null);
 
             // TODO: Add your update logic here
 
@@ -2398,7 +2412,7 @@ namespace SnakeExtreme
             {
                 levelTiledMapRenderer.Update(gameTime);
                 foreach (var gameObject in gameObjects)
-                    gameObject.Update(gameTime, mouseState, keyboardState);
+                    gameObject.Update(gameTime, mouseState, keyboardState, touchState);
             }
 
             // Perform strict time updates.
