@@ -58,6 +58,7 @@ namespace SnakeExtreme
         [JSInvokable]
         public string GetLog()
         {
+            // This is left here for debugging purposes only.
             return $"Touch Connected: {TouchPanel.GetCapabilities().IsConnected}";
         }
         [JSInvokable]

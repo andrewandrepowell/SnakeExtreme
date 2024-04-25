@@ -9,10 +9,13 @@ export function registerServiceUpdates(dotnetHelper) {
     window.addEventListener('load', () => {
         dotnetHelper.invokeMethodAsync('ServiceWindowSizeUpdate', window.innerWidth, window.innerHeight);    
     });
-    window.addEventListener('resize', () => {        
-        dotnetHelper.invokeMethodAsync('GetLog').then(data => {
-            window.alert(data);
-        });
+    window.addEventListener('resize', () => {
+        // This is left here purely for debugging purposes.
+        // Currently, the only way to see log messages on mobile is to use the alert box.
+        // It's a bit hacky, but it gets the job done.
+        //dotnetHelper.invokeMethodAsync('GetLog').then(data => {
+        //    window.alert(data);
+        //});
         dotnetHelper.invokeMethodAsync('ServiceWindowSizeUpdate', window.innerWidth, window.innerHeight);
     });
     window.document.addEventListener('touchstart', (event) => {
