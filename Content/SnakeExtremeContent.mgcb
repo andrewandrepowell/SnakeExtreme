@@ -10,11 +10,12 @@
 
 #-------------------------------- References --------------------------------#
 
-/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Content.Pipeline.dll
-/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.dll
-/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Graphics.dll
-/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\MonoGame.Extended.Tiled.dll
-/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\Newtonsoft.Json.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\publish\win-x64\MonoGame.Extended.Content.Pipeline.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\publish\win-x64\MonoGame.Extended.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\publish\win-x64\MonoGame.Extended.Graphics.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\publish\win-x64\MonoGame.Extended.Tiled.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\publish\win-x64\MonoGame.Framework.dll
+/reference:..\..\MonoGame.Extended\src\cs\MonoGame.Extended.Content.Pipeline\bin\net8.0\publish\win-x64\Newtonsoft.Json.dll
 
 #---------------------------------- Content ---------------------------------#
 

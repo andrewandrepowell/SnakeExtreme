@@ -599,9 +599,9 @@ namespace SnakeExtreme
             float waitRatio = (float)waitCount / waitTotal;
 
             if (State == States.Open)
-                boardHeightOffset = MathHelper.Lerp(0, boardHeightMax, waitRatio);
+                boardHeightOffset = MathHelper.SmoothStep(0, boardHeightMax, waitRatio);
             else if (State == States.Close)
-                boardHeightOffset = MathHelper.Lerp(boardHeightMax, 0, waitRatio);
+                boardHeightOffset = MathHelper.SmoothStep(boardHeightMax, 0, waitRatio);
             else if (State == States.Opened)
                 boardHeightOffset = 0;
             else if (State == States.Closed)
@@ -1882,7 +1882,7 @@ namespace SnakeExtreme
             // TODO: Use this.Content to load your game content here
             Ball.LoadAll(Content);
 
-            levelTiledMap = Content.Load<TiledMap>("tiled_project/level_0");
+            levelTiledMap = Content.Load<TiledMap>("tiled_project/level_0");            
             levelTiledMapRenderer = new TiledMapRenderer(GraphicsDevice, levelTiledMap);
             var maskLayer = levelTiledMap.TileLayers.Where(x => x.Name == "mask_0").First();                      
             for (int x = 0; x < levelTiledMap.Width; x++)
