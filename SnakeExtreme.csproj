@@ -3,7 +3,7 @@
   <PropertyGroup>
     <WasmEnableSIMD>false</WasmEnableSIMD>
 	<WasmEnableExceptionHandling>false</WasmEnableExceptionHandling>
-	<WasmBuildNative>true</WasmBuildNative>
+	<WasmBuildNative>false</WasmBuildNative>
     <BlazorWebAssemblyJiterpreter>false</BlazorWebAssemblyJiterpreter>
   </PropertyGroup>
 	
@@ -58,10 +58,6 @@
 
   <ItemGroup>
     <PackageReference Include="nkast.Xna.Framework" Version="3.11.9002" />
-    <PackageReference Include="nkast.Xna.Framework.Content" Version="3.11.9002" />
-    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="3.11.9002" />
-    <PackageReference Include="nkast.Xna.Framework.Audio" Version="3.11.9002" />
-    <PackageReference Include="nkast.Xna.Framework.Media" Version="3.11.9002" />
     <PackageReference Include="nkast.Xna.Framework.Blazor" Version="3.11.9003" />
     <PackageReference Include="nkast.Xna.Framework.Content.Pipeline.Builder" Version="3.11.9002" />
   </ItemGroup>

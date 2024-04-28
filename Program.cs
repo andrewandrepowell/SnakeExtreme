@@ -7,8 +7,10 @@ using Microsoft.Xna.Framework.Input.Touch;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -23,14 +25,18 @@ namespace SnakeExtreme
         // https://www.w3schools.com/jsref/obj_touchevent.asp
         // https://www.w3schools.com/jsref/dom_obj_event.asp
         // https://learn.microsoft.com/en-us/aspnet/core/blazor/javascript-interoperability/call-dotnet-from-javascript?view=aspnetcore-8.0
+        private const int queueLimits = 64;
         private readonly IJSRuntime jsRuntime;
         private IJSObjectReference jsModule;        
         private static Size trueDimensions;
+        private static HashSet<string> keysPressed = new();
         private class BrowserSize
         {
             public int Width { get; set; }
             public int Height { get; set; }
         }
+        public delegate void ServiceKeysPressed(IReadOnlyCollection<string> keysPressed);
+        public static HashSet<ServiceKeysPressed> ServiceKeysPressedSet { get; } = new();
         public class Touch
         {
             public float X { get; set; }
@@ -54,7 +60,7 @@ namespace SnakeExtreme
                 DimensionsUpdated = true;
             }
         }
-        public static bool DimensionsUpdated { get; private set; } = false;
+        public static bool DimensionsUpdated { get; private set; } = false;        
         [JSInvokable]
         public string GetLog()
         {
@@ -70,8 +76,25 @@ namespace SnakeExtreme
         public void ServiceTouchStartUpdate(Touch[] touches)
         {            
             foreach (var touch in touches)
-                if (Touches.Count < 64)
+                if (Touches.Count < queueLimits)
                     Touches.Enqueue(new Vector2(touch.X, touch.Y));
+        }        
+        [JSInvokable]
+        public void ServiceKeyPressedUpdate(string key, bool pressed)
+        {
+            if (key != null)
+            {
+                if (pressed)
+                    keysPressed.Add(key);
+                else
+                    keysPressed.Remove(key);
+            }
+            else
+            {
+                keysPressed.Clear();
+            }
+            foreach (var serviceKeysPressed in ServiceKeysPressedSet)
+                serviceKeysPressed(keysPressed);                       
         }
         public async Task ConfigureBrowserServer()
         {

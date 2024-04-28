@@ -1676,15 +1676,16 @@ namespace SnakeExtreme
             { Modes.Pause, "pause_0" },
             { Modes.Start, "start_0" },
         });
-        private readonly static ReadOnlyDictionary<Modes, Keys> keyMap = new(new Dictionary<Modes, Keys>()
+        private readonly static ReadOnlyDictionary<Modes, string> keyMap = new(new Dictionary<Modes, string>()
         {
-            { Modes.Up, Keys.Up },
-            { Modes.Down, Keys.Down },
-            { Modes.Left, Keys.Left },
-            { Modes.Right, Keys.Right },
-            { Modes.Pause, Keys.Escape },
-            { Modes.Start, Keys.Enter },
+            { Modes.Up, "ArrowUp" },
+            { Modes.Down, "ArrowDown" },
+            { Modes.Left, "ArrowLeft" },
+            { Modes.Right, "ArrowRight" },
+            { Modes.Pause, "Escape" },
+            { Modes.Start, "Enter" },
         });
+        private bool serviceKeysPressedSelectOccurred = false;        
         public Button(ContentManager content, Modes mode)
         {
             Mode = mode;
@@ -1700,8 +1701,11 @@ namespace SnakeExtreme
                 messageSprite = new AnimatedSprite(spriteSheet);
                 messageSprite.Origin = Vector2.Zero;
                 messageSprite.Play(nameMap[mode]);
-            }            
-        }
+            }
+            {
+                BrowserService.ServiceKeysPressedSet.Add(ServiceKeysPressed);
+            }
+        }        
         public enum Modes { Up, Down, Left, Right, Pause, Start }        
         public Modes Mode { get; }
         public bool Selected { get; private set; } = false;
@@ -1710,32 +1714,43 @@ namespace SnakeExtreme
         public Vector2 Position { get; set; }
         public Size Size { get; }
         public int Priority { get => (int)Position.Y; set => throw new NotImplementedException(); }
+        public void ServiceKeysPressed(IReadOnlyCollection<string> keysPressed)
+        {
+            if (!Selected && keysPressed.Contains(keyMap[Mode]))
+            {                
+                Selected = true;
+                Pressed = true;
+                serviceKeysPressedSelectOccurred = true;
+            }
+            else if (Selected && !keysPressed.Contains(keyMap[Mode]))
+            {                
+                Selected = false;
+                Released = true;
+                serviceKeysPressedSelectOccurred = false;                
+            }
+        }
         public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {            
             if (!Selected && ((
                 mouseState.LeftButton == ButtonState.Pressed && 
                 mouseState.Position.X >= Position.X && mouseState.X < (Position.X + Size.Width) &&
-                mouseState.Position.Y >= Position.Y && mouseState.Y < (Position.Y + Size.Height)) || (
-                keyboardState.IsKeyDown(keyMap[Mode])) || (
+                mouseState.Position.Y >= Position.Y && mouseState.Y < (Position.Y + Size.Height)) || (                
                 touchState.HasValue &&
                 touchState.Value.X >= Position.X && touchState.Value.X < (Position.X + Size.Width) &&
                 touchState.Value.Y >= Position.Y && touchState.Value.Y < (Position.Y + Size.Height))))
-            {
-                visualSprite.Play("selected_0");
+            {                              
                 Selected = true;
                 Pressed = true;                
-            }
+            }            
             else
             {
                 Pressed = false;
             }
 
-            if (Selected && ((
-                mouseState.LeftButton != ButtonState.Pressed) && 
-                keyboardState.IsKeyUp(keyMap[Mode]) &&
+            if (Selected && !serviceKeysPressedSelectOccurred && ((
+                mouseState.LeftButton != ButtonState.Pressed) &&                 
                 !touchState.HasValue))
-            {
-                visualSprite.Play("unselected_0");
+            {                                
                 Selected = false;
                 Released = true;
             }
@@ -1743,6 +1758,11 @@ namespace SnakeExtreme
             {
                 Released = false;
             }
+
+            if (Selected)
+                visualSprite.Play("selected_0");
+            else
+                visualSprite.Play("unselected_0");
 
             {                
                 visualSprite.Update(gameTime);
@@ -1791,13 +1811,16 @@ namespace SnakeExtreme
         private Dimmer dimmer;
         private Board board;
         private AnyKey anyKey;
-        private Sound moveSound, foodSound, destroySound, pauseSound, obstacleSound;
+        private Sound foodSound, destroySound, pauseSound, obstacleSound;
         private Sound shineFoodAppearSound, shineFoodPickUpSound, shineFoodRemoveObstacle;
+        private List<Sound> moveSounds = new();
+        private int currMoveSound = 0;
         private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;
         private const int minWait = 5;
-        private const int maxWait = 10;
+        private const int maxWait = 8;
+        private const int foodPerReachingMinWait = 40;
         private const int scorePerLevelUpdate = 5;
         private const int obstacleStartThreshold = 1 * scorePerLevelUpdate;
         private const int obstaclesPerLevelUpdate = 2;
@@ -1812,6 +1835,11 @@ namespace SnakeExtreme
         private List<Point> levelCorners = new();
         private List<Point> levelPossiblePositions = new();
         private CenterScreen centerScreen;
+        private List<float> deltaTimes = new();
+        private List<float> updateTimes = new();
+        private Stopwatch updateStopwatch = new();        
+        private const int deltaTimesPerUPS = 10 * 60;
+        private const int updateTimesPerUPS = 10 * 60;
         private Point getRandomLevelPosition(IEnumerable<Point> additionalPositions = null)
         {
             if (additionalPositions == null)
@@ -1842,6 +1870,12 @@ namespace SnakeExtreme
                     obj.turnWait--;
                 }
             }
+        }
+        private void moveSnake(bool growTail = false)
+        {
+            snake.Move(growTail: growTail);
+            moveSounds[currMoveSound].Play(randomPitch: true);
+            currMoveSound = (currMoveSound + 1) % moveSounds.Count;
         }
         public SnakeExtremeGame()
         {
@@ -2018,7 +2052,10 @@ namespace SnakeExtreme
                 (levelTiledMap.HeightInPixels - board.Size.Height) / 2);
             gameObjects.Add(board);
 
-            moveSound = new Sound(Content, "sounds/move_0");
+            moveSounds.Add(new Sound(Content, "sounds/move_0"));
+            moveSounds.Add(new Sound(Content, "sounds/move_0"));
+            moveSounds.Add(new Sound(Content, "sounds/move_0"));
+            moveSounds.Add(new Sound(Content, "sounds/move_0"));
             foodSound = new Sound(Content, "sounds/food_0");
             destroySound = new Sound(Content, "sounds/destroy_0");
             pauseSound = new Sound(Content, "sounds/pause_0");
@@ -2053,12 +2090,14 @@ namespace SnakeExtreme
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Update(GameTime gameTime)
         {
+            // Start the stop watch to track how long the update is taking.
+            updateStopwatch.Start();
+
+            // Acquire input states.
             MouseState mouseState = centerScreen.UpdateMouseState(Mouse.GetState());
             KeyboardState keyboardState = Keyboard.GetState();
             Vector2? touchState = (BrowserService.Touches.Count > 0 ?
-                centerScreen.UpdateTouchState(BrowserService.Touches.Dequeue()) : null);
-
-            // TODO: Add your update logic here
+                centerScreen.UpdateTouchState(BrowserService.Touches.Dequeue()) : null);            
 
             // Service buttons
             if (upButton.Pressed)
@@ -2140,7 +2179,7 @@ namespace SnakeExtreme
             }
 
             if (PauseState == PauseStates.Resumed && GameState == GameStates.Wait && waitCount == 0)
-            {
+            {                
                 snake.Direction = newDirection;
                 var snakeNextLevelPosition = snake.LevelPosition + Snake.DirectionPoints[snake.Direction];
 
@@ -2154,6 +2193,7 @@ namespace SnakeExtreme
                     lightningObjects.Any(x => (x.obstacle.State == LightningObstacle.States.Normal && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait != 0) ||
                                               (x.obstacle.State == LightningObstacle.States.Gone && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait == 0));
 
+                // Check for game over condition.
                 if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
                     snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY ||
                     snake.Bodies.Any(x=> x.LevelPosition == snakeNextLevelPosition && x != snake.Tail) ||
@@ -2182,11 +2222,11 @@ namespace SnakeExtreme
 
                     GameState = GameStates.Destroy;                    
                 }
+                // Check for food.
                 else if (snakeNextLevelPosition == food.LevelPosition)
-                {                    
+                {
                     // Move / grow the snake.
-                    snake.Move(growTail: (int)(levelPossiblePositions.Count * 0.40f) >= snake.Count);
-                    moveSound.Play(randomPitch: true);
+                    moveSnake(growTail: (int)(levelPossiblePositions.Count * 0.40f) >= snake.Count);                    
 
                     // Generate food.
                     Debug.Assert(newFood == null);
@@ -2264,6 +2304,7 @@ namespace SnakeExtreme
                     Debug.Assert(removeShineFood == null);
                     removeShineFood = shineFoods.Where(x => x.LevelPosition == snakeNextLevelPosition).FirstOrDefault();
 
+                    // Devour the obstacle / lose shine.
                     if (aboutToCollideWithObstacle && snake.Mode == Snake.Modes.Shine)
                     {
                         Debug.Assert(removeObstacle == null);
@@ -2288,6 +2329,7 @@ namespace SnakeExtreme
                         snake.Mode = Snake.Modes.Normal;
                         ShineState = ShineStates.RemoveObstacle;
                     }
+                    // Pick up shine.
                     else if (removeShineFood != null)
                     {
                         removeShineFood.Vanish();
@@ -2297,16 +2339,19 @@ namespace SnakeExtreme
                         snake.Mode = Snake.Modes.Shine;
                         ShineState = ShineStates.NewShine;
                     }
+                    // Shine state not impacted.
                     else
                     {
                         ShineState = ShineStates.Normal;
                     }
 
-                    snake.Move(growTail: false);
-                    moveSound.Play(randomPitch: true);
+                    // Move the snake.
+                    moveSnake(growTail: false);
 
+                    // Update the counts on the lightning objects.
                     updateLightningObjects();
 
+                    // Set the next state.
                     FoodState = FoodStates.Normal;
                     GameState = GameStates.Action;                    
                 }                 
@@ -2358,7 +2403,7 @@ namespace SnakeExtreme
                     newFood = null;
 
                     waitTotal = (int)MathHelper.Lerp(maxWait, minWait, 
-                        (float)currentScorePanel.Value / ((scorePerLevelUpdate * (maxWait - minWait))));                    
+                        (float)currentScorePanel.Value / foodPerReachingMinWait);                    
 
                     waitCount = waitTotal - 1;
                     GameState = GameStates.Wait;
@@ -2417,17 +2462,38 @@ namespace SnakeExtreme
 
             // Perform strict time updates.
             {
-                float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+                float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;                
                 strictTimePassed += deltaTime;
                 for (; strictTimePassed >= strictTimeAmount; strictTimePassed -= strictTimeAmount)
-                {
-                    if (waitCount > 0)
-                        waitCount--;
+                {                    
                     foreach (var gameObject in gameObjects)
                         gameObject.StrictUpdate();
+                    if (waitCount > 0)
+                        waitCount--;
                 }
             }
 
+            // Finish recording the update time elapsed.
+#if DEBUG
+            {
+                updateStopwatch.Stop();
+                var updateTime = (float)updateStopwatch.Elapsed.TotalSeconds;
+                updateTimes.Add(updateTime);
+                if (updateTimes.Count == updateTimesPerUPS)
+                {                                        
+                    Console.WriteLine($"Upate Times Average: {updateTimes.Average()}, Min: {updateTimes.Min()}, Max: {updateTimes.Max()}");
+                    updateTimes.Clear();
+                }
+                updateStopwatch.Reset();
+
+                deltaTimes.Add((float)gameTime.ElapsedGameTime.TotalSeconds);
+                if (deltaTimes.Count == deltaTimesPerUPS)
+                {
+                    Console.WriteLine($"Current Delatimes Average: {deltaTimes.Average()}, Update Rate: {1 / deltaTimes.Average()}");
+                    deltaTimes.Clear();
+                }
+            }
+#endif
             base.Update(gameTime);
         }
 
