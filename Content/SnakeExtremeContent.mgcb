@@ -332,3 +332,8 @@
 /processorParam:Quality=Best
 /build:sounds/shine_food_2.wav
 
+#begin tiled_project/level_1.tmx
+/importer:TiledMapImporter
+/processor:TiledMapProcessor
+/build:tiled_project/level_1.tmx
+

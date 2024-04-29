@@ -1,8 +1,8 @@
 {
   "textureAtlas": {
     "texture": "button_0.png",
-    "regionWidth": 64,
-    "regionHeight": 64
+    "regionWidth": 96,
+    "regionHeight": 96
   },
   "cycles": {
     "unselected_0": {

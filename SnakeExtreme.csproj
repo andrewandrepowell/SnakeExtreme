@@ -3,8 +3,8 @@
   <PropertyGroup>
     <WasmEnableSIMD>false</WasmEnableSIMD>
 	<WasmEnableExceptionHandling>false</WasmEnableExceptionHandling>
-	<WasmBuildNative>false</WasmBuildNative>
-    <BlazorWebAssemblyJiterpreter>false</BlazorWebAssemblyJiterpreter>
+	<WasmBuildNative>true</WasmBuildNative>
+    <BlazorWebAssemblyJiterpreter>true</BlazorWebAssemblyJiterpreter>
   </PropertyGroup>
 	
   <PropertyGroup>

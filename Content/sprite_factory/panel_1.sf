@@ -1,8 +1,8 @@
 {
   "textureAtlas": {
     "texture": "panel_1.png",
-    "regionWidth": 640,
-    "regionHeight": 608
+    "regionWidth": 608,
+    "regionHeight": 640
   },
   "cycles": {
     "panel_0": {

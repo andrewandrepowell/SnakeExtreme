@@ -403,7 +403,17 @@ namespace SnakeExtreme
             if (Mode == Modes.AudioAvailable)
             {
                 soundEffectInstance.Pitch = 
-                    (randomPitch ? random.NextSingle() - 0.5f : 0);                
+                    (randomPitch ? random.NextSingle() - 0.5f : 0);
+                // It is extremely important to stop prior to playing
+                // Stop puts the SoundEffectInstance into its Stopped state
+                // which causes Play to run PlatformPlay under-the-hood.
+                // This is important because PlatformPlay, after traversing several
+                // nested calls into nkast.Wasm.Audio.Audio.8.0.0.js, will run
+                // JavaScript function nkAudioScheduledSourceNode.Start.
+                // That function will refresh the AudioContext used by SoundEffectInstance
+                // which is needed to prevent the "The AudioContext was not allowed to start
+                // error. It must be resumed (or created) after a user gesture on the page."
+                soundEffectInstance.Stop(); 
                 soundEffectInstance.Play();
             }
         } 
@@ -644,11 +654,6 @@ namespace SnakeExtreme
     }
     public class AnyKey : IObject
     {
-        private readonly Sound blankSound;
-        public AnyKey(ContentManager content)
-        {
-            blankSound = new Sound(content, "sounds/move_0") { Volume = 0 };
-        }
         public bool Selected { get; private set; } = false;
         public bool Pressed { get; private set; } = false;
         public bool Released { get; private set; } = false;
@@ -662,11 +667,6 @@ namespace SnakeExtreme
             {
                 Selected = true;
                 Pressed = true;
-
-                // This here is a hack. I have no idea why, but playing an empty sound, i.e. volume is 0,
-                // causes the "The AudioContext was not allowed to start" issue fixed upon launch.
-                // Need to research more as to why this works.
-                blankSound.Play();
             }
             else
             {
@@ -1838,8 +1838,8 @@ namespace SnakeExtreme
         private List<float> deltaTimes = new();
         private List<float> updateTimes = new();
         private Stopwatch updateStopwatch = new();        
-        private const int deltaTimesPerUPS = 10 * 60;
-        private const int updateTimesPerUPS = 10 * 60;
+        private const int deltaTimesPerUPS = 2 * 60;
+        private const int updateTimesPerUPS = 2 * 60;
         private Point getRandomLevelPosition(IEnumerable<Point> additionalPositions = null)
         {
             if (additionalPositions == null)
@@ -1916,7 +1916,7 @@ namespace SnakeExtreme
             // TODO: Use this.Content to load your game content here
             Ball.LoadAll(Content);
 
-            levelTiledMap = Content.Load<TiledMap>("tiled_project/level_0");
+            levelTiledMap = Content.Load<TiledMap>("tiled_project/level_1");
             levelTiledMapRenderer = new TiledMapRenderer(GraphicsDevice, levelTiledMap);
             var maskLayer = levelTiledMap.TileLayers.Where(x => x.Name == "mask_0").First();                      
             for (int x = 0; x < levelTiledMap.Width; x++)
@@ -2022,7 +2022,7 @@ namespace SnakeExtreme
                         levelPossiblePositions.Add(new Point(x, y));                                    
             }
 
-            anyKey = new AnyKey(Content);
+            anyKey = new AnyKey();
             gameObjects.Add(anyKey);
 
             dimmer = new Dimmer(Content, levelTiledMap.WidthInPixels, levelTiledMap.HeightInPixels)
@@ -2071,7 +2071,8 @@ namespace SnakeExtreme
 
             dimmer.Dim();
             board.Open();
-            PauseState = PauseStates.Pause;
+            pauseSound.Play();                     
+            PauseState = PauseStates.Pause;            
         }
 
         /// <summary>
@@ -2091,7 +2092,7 @@ namespace SnakeExtreme
         protected override void Update(GameTime gameTime)
         {
             // Start the stop watch to track how long the update is taking.
-            updateStopwatch.Start();
+            // updateStopwatch.Start();
 
             // Acquire input states.
             MouseState mouseState = centerScreen.UpdateMouseState(Mouse.GetState());
@@ -2156,10 +2157,10 @@ namespace SnakeExtreme
             if (anyKey.Pressed)
             {
                 if (PauseState == PauseStates.Paused)
-                {
+                {                    
                     dimmer.Brighten();
                     board.Close();
-                    pauseSound.Play();
+                    pauseSound.Play();                    
                     PauseState = PauseStates.Resume;                    
                 }
             }
@@ -2179,7 +2180,7 @@ namespace SnakeExtreme
             }
 
             if (PauseState == PauseStates.Resumed && GameState == GameStates.Wait && waitCount == 0)
-            {                
+            {
                 snake.Direction = newDirection;
                 var snakeNextLevelPosition = snake.LevelPosition + Snake.DirectionPoints[snake.Direction];
 
@@ -2188,7 +2189,7 @@ namespace SnakeExtreme
                 var minY = levelCorners.Select(x => x.Y).Min();
                 var maxY = levelCorners.Select(x => x.Y).Max();
 
-                var aboutToCollideWithObstacle = 
+                var aboutToCollideWithObstacle =
                     obstacles.Any(x => x.LevelPosition == snakeNextLevelPosition) ||
                     lightningObjects.Any(x => (x.obstacle.State == LightningObstacle.States.Normal && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait != 0) ||
                                               (x.obstacle.State == LightningObstacle.States.Gone && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait == 0));
@@ -2196,7 +2197,7 @@ namespace SnakeExtreme
                 // Check for game over condition.
                 if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
                     snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY ||
-                    snake.Bodies.Any(x=> x.LevelPosition == snakeNextLevelPosition && x != snake.Tail) ||
+                    snake.Bodies.Any(x => x.LevelPosition == snakeNextLevelPosition && x != snake.Tail) ||
                     (aboutToCollideWithObstacle && snake.Mode == Snake.Modes.Normal) ||
                     gameDestroy)
                 {
@@ -2208,7 +2209,7 @@ namespace SnakeExtreme
                         food.Vanish();
                     foreach (var obstacle in obstacles)
                         obstacle.Vanish();
-                    foreach (var x in lightningObjects)                    
+                    foreach (var x in lightningObjects)
                         if (x.obstacle.State == LightningObstacle.States.Normal)
                             x.obstacle.Vanish();
 
@@ -2220,13 +2221,13 @@ namespace SnakeExtreme
 
                     destroySound.Play();
 
-                    GameState = GameStates.Destroy;                    
+                    GameState = GameStates.Destroy;
                 }
                 // Check for food.
                 else if (snakeNextLevelPosition == food.LevelPosition)
                 {
                     // Move / grow the snake.
-                    moveSnake(growTail: (int)(levelPossiblePositions.Count * 0.40f) >= snake.Count);                    
+                    moveSnake(growTail: (int)(levelPossiblePositions.Count * 0.40f) >= snake.Count);
 
                     // Generate food.
                     Debug.Assert(newFood == null);
@@ -2246,7 +2247,7 @@ namespace SnakeExtreme
                         var shineFoodCreated = false;
 
                         // Generate obstacle.
-                        if (currentScorePanel.Value >= obstacleStartThreshold &&                            
+                        if (currentScorePanel.Value >= obstacleStartThreshold &&
                             (int)(levelPossiblePositions.Count * 0.25f) >= obstacles.Count)
                         {
                             for (int i = 0; i < obstaclesPerLevelUpdate; i++)
@@ -2291,7 +2292,7 @@ namespace SnakeExtreme
                             obstacleSound.Play();
                         if (shineFoodCreated)
                             shineFoodAppearSound.Play();
-                    }                    
+                    }
 
                     updateLightningObjects();
 
@@ -2312,7 +2313,7 @@ namespace SnakeExtreme
                         removeObstacle = obstacles.Where(x => x.LevelPosition == snakeNextLevelPosition).FirstOrDefault();
                         removeLightningObject = lightningObjects.Where(x => x.obstacle.LevelPosition == snakeNextLevelPosition).FirstOrDefault();
                         Debug.Assert((removeObstacle != null ? 1 : 0) + (removeLightningObject != null ? 1 : 0) == 1);
-                        
+
                         if (removeObstacle != null)
                         {
                             removeObstacle.Vanish();
@@ -2353,8 +2354,8 @@ namespace SnakeExtreme
 
                     // Set the next state.
                     FoodState = FoodStates.Normal;
-                    GameState = GameStates.Action;                    
-                }                 
+                    GameState = GameStates.Action;
+                }
             }
 
             if (PauseState == PauseStates.Resumed &&
@@ -2474,26 +2475,25 @@ namespace SnakeExtreme
             }
 
             // Finish recording the update time elapsed.
-#if DEBUG
-            {
-                updateStopwatch.Stop();
-                var updateTime = (float)updateStopwatch.Elapsed.TotalSeconds;
-                updateTimes.Add(updateTime);
-                if (updateTimes.Count == updateTimesPerUPS)
-                {                                        
-                    Console.WriteLine($"Upate Times Average: {updateTimes.Average()}, Min: {updateTimes.Min()}, Max: {updateTimes.Max()}");
-                    updateTimes.Clear();
-                }
-                updateStopwatch.Reset();
+            //    {
+            //        updateStopwatch.Stop();
+            //        var updateTime = (float)updateStopwatch.Elapsed.TotalSeconds;
+            //        updateTimes.Add(updateTime);
+            //        if (updateTimes.Count == updateTimesPerUPS)
+            //        {                                        
+            //            Console.WriteLine($"Upate Times Average: {updateTimes.Average()}, Min: {updateTimes.Min()}, Max: {updateTimes.Max()}");
+            //            updateTimes.Clear();
+            //        }
+            //        updateStopwatch.Reset();
 
-                deltaTimes.Add((float)gameTime.ElapsedGameTime.TotalSeconds);
-                if (deltaTimes.Count == deltaTimesPerUPS)
-                {
-                    Console.WriteLine($"Current Delatimes Average: {deltaTimes.Average()}, Update Rate: {1 / deltaTimes.Average()}");
-                    deltaTimes.Clear();
-                }
-            }
-#endif
+            //        deltaTimes.Add((float)gameTime.ElapsedGameTime.TotalSeconds);
+            //        if (deltaTimes.Count == deltaTimesPerUPS)
+            //        {
+            //            Console.WriteLine($"Current Delatimes Average: {deltaTimes.Average()}, Update Rate: {1 / deltaTimes.Average()}");
+            //            deltaTimes.Clear();
+            //        }
+            //    }
+
             base.Update(gameTime);
         }
 
