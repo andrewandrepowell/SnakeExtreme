@@ -1,8 +1,8 @@
 {
   "textureAtlas": {
     "texture": "texts_0.png",
-    "regionWidth": 128,
-    "regionHeight": 64
+    "regionWidth": 160,
+    "regionHeight": 96
   },
   "cycles": {
     "pause_0": {

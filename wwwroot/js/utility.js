@@ -38,14 +38,7 @@ export function registerServiceUpdates(dotnetHelper) {
         dotnetHelper.invokeMethodAsync('ServiceKeyPressedUpdate', event.key, false)
     })
 
-    // This is probalematic. Can't figure out how to get the focus events to work.
-    // I'll leave this alone for now, but these events are imperative since certain
-    // operations need to get refreshed if focused is lost.
-    //window.addEventListener('onblur', (event) => {
-    //    console.log("Testing Focus")
-    //    dotnetHelper.invokeMethodAsync('ServiceKeyPressedUpdate', null, false)
-    //})
-    //window.document.addEventListener('onfocus', (event) => {    
-    //    console.log("Testing Loss Focus")
-    //})
+    window.addEventListener('blur', (event) => {        
+        dotnetHelper.invokeMethodAsync('ServiceKeyPressedUpdate', null, false)
+    })
 }

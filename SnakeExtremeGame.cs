@@ -1818,7 +1818,7 @@ namespace SnakeExtreme
         private Snake.Directions newDirection;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;
-        private const int minWait = 5;
+        private const int minWait = 3;
         private const int maxWait = 8;
         private const int foodPerReachingMinWait = 40;
         private const int scorePerLevelUpdate = 5;
