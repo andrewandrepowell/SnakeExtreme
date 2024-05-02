@@ -1152,7 +1152,7 @@ namespace SnakeExtreme
         private Point nextLevelPosition;
         private MovementModes trueMovementMode = MovementModes.Normal;
         private int moveWait;
-        private const int moveTotal = 5;
+        private const int moveTotal = 4;
         private void updateBallPosition() =>
             ball.Position = new Vector2(trueLevelPosition.X* Size.Width, trueLevelPosition.Y* Size.Height);
         public SnakeBody(ContentManager content)
@@ -2452,8 +2452,8 @@ namespace SnakeExtreme
                     food = newFood;
                     newFood = null;
 
-                    waitTotal = (int)MathHelper.Lerp(maxWait, minWait, 
-                        (float)currentScorePanel.Value / foodPerReachingMinWait);                    
+                    waitTotal = (int)MathHelper.Clamp(MathHelper.Lerp(maxWait, minWait, 
+                        (float)currentScorePanel.Value / foodPerReachingMinWait), minWait, maxWait);                    
 
                     waitCount = waitTotal - 1;
                     GameState = GameStates.Wait;
