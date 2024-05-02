@@ -1007,8 +1007,7 @@ namespace SnakeExtreme
     public class Snake : IObject, ITangible, ILevelObject
     {
         private readonly List<SnakeBody> bodies = new();
-        private readonly ContentManager content;        
-        private bool growTail = false;
+        private readonly ContentManager content;                
         private Directions trueDirection = Directions.Up;
         public Snake(ContentManager content)
         {            
@@ -1052,31 +1051,56 @@ namespace SnakeExtreme
         public int Count { get => bodies.Count; }
         public bool Headless { get => Count == 0; }
         public SnakeBody Head { get => bodies[0]; }
-        public SnakeBody Tail { get => bodies.Last(); }
-        public bool NewTailAvailable { get; private set; } = false;
+        public SnakeBody Tail { get => bodies.Last(); }        
         public IEnumerable<SnakeBody> Bodies { get => bodies; }
         public void CreateHead(Point startLevelPosition)
         {
             Debug.Assert(Headless);
             Debug.Assert(Mode == Modes.Normal);
-            bodies.Add(new SnakeBody(content) { LevelPosition = startLevelPosition });
+            bodies.Add(new SnakeBody(content) 
+            { 
+                LevelPosition = startLevelPosition, 
+                MovementMode = SnakeBody.MovementModes.Shift 
+            });
             Head.LongAppear();
             State = States.Appear;
         }
-        public void Move(bool growTail = false)
+        public SnakeBody Move(bool growTail = false)
         {
             Debug.Assert(!Headless);
             Debug.Assert(State == States.Normal);
-            Debug.Assert(bodies.All(x => x.State == Ball.States.Normal || x.State == Ball.States.ShineNormal));
-            this.growTail = growTail;
-            foreach (var body in bodies)
+            Debug.Assert(bodies.All(x => 
+                (x.State == Ball.States.Normal || x.State == Ball.States.ShineNormal) &&
+                (x.MovementMode == SnakeBody.MovementModes.Shift && x.MovementState == SnakeBody.MovementStates.Stopped)));
+
+            if (Mode == Modes.Shine && Head.State == Ball.States.Normal)
+                Head.ShineAppear();
+            if (Mode == Modes.Normal && Head.State == Ball.States.ShineNormal)
+                Head.QuickAppear();
+
+            SnakeBody newTail = null;
+            if (growTail)
             {
-                if (body == Head && Mode == Modes.Shine && body.State == Ball.States.ShineNormal)
-                    body.ShineVanish();
+                newTail = new SnakeBody(content);
+                bodies.Add(newTail);
+            }
+
+            for (int i = bodies.Count - 1; i >= 0; i--)
+            {
+                if (i == 0)
+                    bodies[i].LevelPosition += DirectionPoints[Direction];
                 else
-                    body.QuickVanish();
+                    bodies[i].LevelPosition = bodies[i - 1].LevelPosition;
+                if (growTail && i == bodies.Count - 1)
+                {
+                    bodies[i].LongAppear();
+                    bodies[i].UpdateFloatHeight(bodies[i - 1]);
+                    bodies[i].MovementMode = SnakeBody.MovementModes.Shift;
+                }
             }
             State = States.Move;
+
+            return newTail;
         }
         public void Vanish()
         {
@@ -1101,40 +1125,9 @@ namespace SnakeExtreme
         public int Priority { get => (Headless ? 0 : (int)Position.Y); set => throw new NotImplementedException(); }
         public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
         {
-            if (State == States.Move && bodies.All(x=>x.State == Ball.States.Invisible))
-            {
-                if (growTail)
-                {
-                    bodies.Add(new SnakeBody(content));
-                    NewTailAvailable = true;
-                }
-                for (int i = bodies.Count - 1; i >= 0; i--)
-                {                    
-                    if (i == 0)
-                        bodies[i].LevelPosition += DirectionPoints[Direction];
-                    else
-                        bodies[i].LevelPosition = bodies[i - 1].LevelPosition;
-                    if (growTail && i == bodies.Count - 1)
-                    {
-                        bodies[i].LongAppear();
-                        bodies[i].UpdateFloatHeight(bodies[i - 1]);
-                    }
-                    else if (i == 0 && Mode == Modes.Shine)
-                    {
-                        bodies[i].ShineAppear();
-                    }
-                    else  
-                    {
-                        bodies[i].QuickAppear();
-                    }
-                }
-            }
-            else
-            {
-                NewTailAvailable = false;
-            }
-            if ((State == States.Move || State == States.Appear) && 
-                bodies.All(x=>x.State == Ball.States.Normal || x.State == Ball.States.ShineNormal))
+            if ((State == States.Move || State == States.Appear) && bodies.All(x=>
+                (x.State == Ball.States.Normal || x.State == Ball.States.ShineNormal) &&
+                (x.MovementState == SnakeBody.MovementStates.Stopped)))
             {
                 State = States.Normal;
             }
@@ -1155,10 +1148,29 @@ namespace SnakeExtreme
         private const int ballId = 3;
         private readonly Ball ball;
         private Point trueLevelPosition;
+        private Point startLevelPosition;
+        private Point nextLevelPosition;
+        private MovementModes trueMovementMode = MovementModes.Normal;
+        private int moveWait;
+        private const int moveTotal = 5;
+        private void updateBallPosition() =>
+            ball.Position = new Vector2(trueLevelPosition.X* Size.Width, trueLevelPosition.Y* Size.Height);
         public SnakeBody(ContentManager content)
         {            
             ball = new Ball(content, ballId);
         }
+        public enum MovementModes { Normal, Shift }
+        public enum MovementStates { Stopped, Move }
+        public MovementModes MovementMode 
+        {
+            get => trueMovementMode;
+            set
+            {                
+                Debug.Assert(MovementState == MovementStates.Stopped);
+                trueMovementMode = value;
+            }
+        }
+        public MovementStates MovementState { get; private set; } = MovementStates.Stopped;
         public Ball.States State { get => ball.State; }
         public void ShineAppear() => ball.ShineAppear();
         public void ShineVanish() => ball.ShineVanish();
@@ -1174,6 +1186,24 @@ namespace SnakeExtreme
         }
         public void StrictUpdate()
         {
+            if (MovementMode == MovementModes.Shift && MovementState == MovementStates.Move)
+            {
+                var moveRatio = (float)moveWait / moveTotal;
+                ball.Position = new Vector2(
+                    MathHelper.SmoothStep(nextLevelPosition.X * Size.Width, startLevelPosition.X * Size.Width, moveRatio),
+                    MathHelper.SmoothStep(nextLevelPosition.Y * Size.Height, startLevelPosition.Y * Size.Height, moveRatio));
+            }
+
+            if (MovementMode == MovementModes.Shift && MovementState == MovementStates.Move && moveWait == 0)
+            {
+                trueLevelPosition = nextLevelPosition;
+                updateBallPosition();
+                MovementState = MovementStates.Stopped;
+            }
+
+            if (moveWait > 0)
+                moveWait--;
+
             ball.StrictUpdate();
         }
         public void Draw(SpriteBatch spriteBatch)
@@ -1191,8 +1221,20 @@ namespace SnakeExtreme
             get => trueLevelPosition;
             set
             {
-                trueLevelPosition = value;
-                ball.Position = new Vector2(trueLevelPosition.X * Size.Width, trueLevelPosition.Y * Size.Height);
+                Debug.Assert(MovementState == MovementStates.Stopped);
+                if (MovementMode == MovementModes.Normal)
+                {
+                    trueLevelPosition = value;
+                    updateBallPosition();
+                }
+                else if (MovementMode == MovementModes.Shift)
+                {
+                    startLevelPosition = trueLevelPosition;
+                    nextLevelPosition = value;
+                    moveWait = moveTotal - 1;
+                    MovementState = MovementStates.Move;
+
+                }
             }
         }
     }
@@ -1811,16 +1853,15 @@ namespace SnakeExtreme
         private Dimmer dimmer;
         private Board board;
         private AnyKey anyKey;
-        private Sound foodSound, destroySound, pauseSound, obstacleSound;
+        private Sound foodSound, destroySound, pauseSound, obstacleSound, moveSound;
         private Sound shineFoodAppearSound, shineFoodPickUpSound, shineFoodRemoveObstacle;
-        private List<Sound> moveSounds = new();
-        private int currMoveSound = 0;
-        private Snake.Directions newDirection;
+        private Queue<Snake.Directions> newDirections = new();
+        private const int maxNewDirections = 3;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;
         private const int minWait = 3;
-        private const int maxWait = 8;
-        private const int foodPerReachingMinWait = 40;
+        private const int maxWait = 6;
+        private const int foodPerReachingMinWait = 20;
         private const int scorePerLevelUpdate = 5;
         private const int obstacleStartThreshold = 1 * scorePerLevelUpdate;
         private const int obstaclesPerLevelUpdate = 2;
@@ -1873,9 +1914,10 @@ namespace SnakeExtreme
         }
         private void moveSnake(bool growTail = false)
         {
-            snake.Move(growTail: growTail);
-            moveSounds[currMoveSound].Play(randomPitch: true);
-            currMoveSound = (currMoveSound + 1) % moveSounds.Count;
+            var snakeBody = snake.Move(growTail: growTail);
+            if (snakeBody != null)
+                gameObjects.Add(snakeBody);
+            moveSound.Play();
         }
         public SnakeExtremeGame()
         {
@@ -2052,10 +2094,7 @@ namespace SnakeExtreme
                 (levelTiledMap.HeightInPixels - board.Size.Height) / 2);
             gameObjects.Add(board);
 
-            moveSounds.Add(new Sound(Content, "sounds/move_0"));
-            moveSounds.Add(new Sound(Content, "sounds/move_0"));
-            moveSounds.Add(new Sound(Content, "sounds/move_0"));
-            moveSounds.Add(new Sound(Content, "sounds/move_0"));
+            moveSound = new Sound(Content, "sounds/move_0") { Volume = 0.25f };
             foodSound = new Sound(Content, "sounds/food_0");
             destroySound = new Sound(Content, "sounds/destroy_0");
             pauseSound = new Sound(Content, "sounds/pause_0");
@@ -2098,17 +2137,28 @@ namespace SnakeExtreme
             MouseState mouseState = centerScreen.UpdateMouseState(Mouse.GetState());
             KeyboardState keyboardState = Keyboard.GetState();
             Vector2? touchState = (BrowserService.Touches.Count > 0 ?
-                centerScreen.UpdateTouchState(BrowserService.Touches.Dequeue()) : null);            
+                centerScreen.UpdateTouchState(BrowserService.Touches.Dequeue()) : null);
 
             // Service buttons
-            if (upButton.Pressed)
-                newDirection = Snake.Directions.Up;
-            if (downButton.Pressed)
-                newDirection = Snake.Directions.Down;
-            if (leftButton.Pressed)
-                newDirection = Snake.Directions.Left;
-            if (rightButton.Pressed)
-                newDirection = Snake.Directions.Right;
+            {
+                Snake.Directions? newDirection = null;
+                if (upButton.Pressed)
+                    newDirection = Snake.Directions.Up;
+                if (downButton.Pressed)
+                    newDirection = Snake.Directions.Down;
+                if (leftButton.Pressed)
+                    newDirection = Snake.Directions.Left;
+                if (rightButton.Pressed)
+                    newDirection = Snake.Directions.Right;
+                if (newDirection.HasValue && 
+                    PauseState == PauseStates.Resumed && 
+                    newDirections.Count < maxNewDirections &&
+                    (GameState == GameStates.Start || GameState == GameStates.Create ||
+                     GameState == GameStates.Wait || GameState == GameStates.Action))
+                {
+                    newDirections.Enqueue(newDirection.Value);
+                }
+            }
 
             if (startButton.Pressed)
             {
@@ -2124,8 +2174,7 @@ namespace SnakeExtreme
                             (int)levelCorners.Select(x => x.X).Average(),
                             (int)levelCorners.Select(x => x.Y).Average());
                         snake.CreateHead(startLevelPosition);
-                        snake.Direction = Snake.Directions.Up;
-                        newDirection = Snake.Directions.Up;
+                        snake.Direction = Snake.Directions.Up;                        
                         gameObjects.Add(snake.Head);
 
                         food = new Food(Content) { LevelPosition = getRandomLevelPosition() };
@@ -2181,7 +2230,7 @@ namespace SnakeExtreme
 
             if (PauseState == PauseStates.Resumed && GameState == GameStates.Wait && waitCount == 0)
             {
-                snake.Direction = newDirection;
+                snake.Direction = (newDirections.Count > 0 ? newDirections.Dequeue() : snake.Direction);
                 var snakeNextLevelPosition = snake.LevelPosition + Snake.DirectionPoints[snake.Direction];
 
                 var minX = levelCorners.Select(x => x.X).Min();
@@ -2425,6 +2474,8 @@ namespace SnakeExtreme
                 obstacles.All(x => x.State == Obstacle.States.Gone) &&
                 lightningObjects.All(x => x.obstacle.State == LightningObstacle.States.Gone))
             {
+                newDirections.Clear();
+
                 foreach (var body in snake.Bodies)
                     gameObjects.Remove(body);
                 snake.Clear();
@@ -2447,9 +2498,6 @@ namespace SnakeExtreme
 
                 GameState = GameStates.Start;
             }
-
-            if (snake.NewTailAvailable)
-                gameObjects.Add(snake.Tail);
 
             // Update center screen
             centerScreen.Update();
