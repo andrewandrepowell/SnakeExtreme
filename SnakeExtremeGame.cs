@@ -1877,9 +1877,9 @@ namespace SnakeExtreme
         private const int foodPerReachingMinWait = 40;
         private const int scorePerLevelUpdate = 5;
         private const int obstacleStartThreshold = 1 * scorePerLevelUpdate;
-        private const int obstaclesPerLevelUpdate = 2;
+        private const int obstaclesPerLevelUpdate = 4;
         private const int lightningStartThreshold = 2 * scorePerLevelUpdate;
-        private const int lightningPerLevelUpdate = 2;
+        private const int lightningPerLevelUpdate = 4;
         private const int lightningActiveTurns = 5;
         private const int shineStartThreshold = 3 * scorePerLevelUpdate;
         private const int shineMaxAmount = 2;
@@ -2312,7 +2312,7 @@ namespace SnakeExtreme
 
                         // Generate obstacle.
                         if (currentScorePanel.Value >= obstacleStartThreshold &&
-                            (int)(levelPossiblePositions.Count * 0.25f) >= obstacles.Count)
+                            (int)(levelPossiblePositions.Count * 0.20f) >= obstacles.Count)
                         {
                             for (int i = 0; i < obstaclesPerLevelUpdate; i++)
                             {
@@ -2325,7 +2325,7 @@ namespace SnakeExtreme
 
                         // Generate lightning obstacle.
                         if (currentScorePanel.Value >= lightningStartThreshold &&
-                            (int)(levelPossiblePositions.Count * 0.25f) >= obstacles.Count)
+                            (int)(levelPossiblePositions.Count * 0.20f) >= obstacles.Count)
                         {
                             for (int i = 0; i < lightningPerLevelUpdate; i++)
                             {
