@@ -455,6 +455,8 @@ namespace SnakeExtreme
     public static class Utility
     {
         public static readonly IEnumerable<float> PowSpeedTable = GetPowTable(b: (float)Math.Exp(0), resolution: 64);
+        public static Point Multiply(this Point point, int scalar) =>
+            new Point(point.X * scalar, point.Y * scalar);
         public static IEnumerable<float> GetPowTable(float b = 2, int resolution = 32)
         {
             Trace.Assert(resolution > 0);
@@ -1053,16 +1055,27 @@ namespace SnakeExtreme
         public SnakeBody Head { get => bodies[0]; }
         public SnakeBody Tail { get => bodies.Last(); }        
         public IEnumerable<SnakeBody> Bodies { get => bodies; }
-        public void CreateHead(Point startLevelPosition)
+        public void CreateHead(Point startLevelPosition, int extraBodies = 0, Directions extraBodiesDirection = Directions.Down)
         {
             Debug.Assert(Headless);
             Debug.Assert(Mode == Modes.Normal);
+            Debug.Assert(extraBodies >= 0);
             bodies.Add(new SnakeBody(content) 
             { 
                 LevelPosition = startLevelPosition, 
                 MovementMode = SnakeBody.MovementModes.Shift 
             });
             Head.LongAppear();
+            for (int i = 0; i < extraBodies; i++)
+            {
+                var newBody = new SnakeBody(content)
+                {
+                    LevelPosition = startLevelPosition + DirectionPoints[extraBodiesDirection].Multiply(i + 1),
+                    MovementMode = SnakeBody.MovementModes.Shift
+                };
+                newBody.LongAppear();
+                bodies.Add(newBody);
+            }            
             State = States.Appear;
         }
         public SnakeBody Move(bool growTail = false)
@@ -1861,7 +1874,7 @@ namespace SnakeExtreme
         private const float strictTimeAmount = (float)1 / 30;
         private const int minWait = 3;
         private const int maxWait = 6;
-        private const int foodPerReachingMinWait = 20;
+        private const int foodPerReachingMinWait = 40;
         private const int scorePerLevelUpdate = 5;
         private const int obstacleStartThreshold = 1 * scorePerLevelUpdate;
         private const int obstaclesPerLevelUpdate = 2;
@@ -1870,6 +1883,7 @@ namespace SnakeExtreme
         private const int lightningActiveTurns = 5;
         private const int shineStartThreshold = 3 * scorePerLevelUpdate;
         private const int shineMaxAmount = 2;
+        private const int extraBodies = 3;
         private int waitCount;
         private int waitTotal;
         private bool gameDestroy = false;
@@ -2173,9 +2187,10 @@ namespace SnakeExtreme
                         var startLevelPosition = new Point(
                             (int)levelCorners.Select(x => x.X).Average(),
                             (int)levelCorners.Select(x => x.Y).Average());
-                        snake.CreateHead(startLevelPosition);
+                        snake.CreateHead(startLevelPosition, extraBodies, Snake.Directions.Down);
                         snake.Direction = Snake.Directions.Up;                        
-                        gameObjects.Add(snake.Head);
+                        foreach (var body in snake.Bodies)
+                            gameObjects.Add(body);
 
                         food = new Food(Content) { LevelPosition = getRandomLevelPosition() };
                         gameObjects.Add(food);
