@@ -1009,7 +1009,8 @@ namespace SnakeExtreme
     public class Snake : IObject, ITangible, ILevelObject
     {
         private readonly List<SnakeBody> bodies = new();
-        private readonly ContentManager content;                
+        private readonly ContentManager content;    
+        private readonly Dictionary<Point, SnakeBody> levelPositionBodyMap = new();
         private Directions trueDirection = Directions.Up;
         public Snake(ContentManager content)
         {            
@@ -1055,17 +1056,20 @@ namespace SnakeExtreme
         public SnakeBody Head { get => bodies[0]; }
         public SnakeBody Tail { get => bodies.Last(); }        
         public IEnumerable<SnakeBody> Bodies { get => bodies; }
+        public IReadOnlyDictionary<Point, SnakeBody> LevelPositionBodyMap { get => levelPositionBodyMap; } 
         public void CreateHead(Point startLevelPosition, int extraBodies = 0, Directions extraBodiesDirection = Directions.Down)
         {
             Debug.Assert(Headless);
             Debug.Assert(Mode == Modes.Normal);
             Debug.Assert(extraBodies >= 0);
+            Debug.Assert(levelPositionBodyMap.Count == 0);
             bodies.Add(new SnakeBody(content) 
             { 
                 LevelPosition = startLevelPosition, 
                 MovementMode = SnakeBody.MovementModes.Shift 
-            });
+            });            
             Head.LongAppear();
+            levelPositionBodyMap[startLevelPosition] = Head;
             for (int i = 0; i < extraBodies; i++)
             {
                 var newBody = new SnakeBody(content)
@@ -1075,6 +1079,7 @@ namespace SnakeExtreme
                 };
                 newBody.LongAppear();
                 bodies.Add(newBody);
+                levelPositionBodyMap[newBody.LevelPosition] = newBody;
             }            
             State = States.Appear;
         }
@@ -1098,18 +1103,20 @@ namespace SnakeExtreme
                 bodies.Add(newTail);
             }
 
+            levelPositionBodyMap.Clear();
             for (int i = bodies.Count - 1; i >= 0; i--)
             {
                 if (i == 0)
                     bodies[i].LevelPosition += DirectionPoints[Direction];
                 else
-                    bodies[i].LevelPosition = bodies[i - 1].LevelPosition;
+                    bodies[i].LevelPosition = bodies[i - 1].LevelPosition;                
                 if (growTail && i == bodies.Count - 1)
                 {
                     bodies[i].LongAppear();
                     bodies[i].UpdateFloatHeight(bodies[i - 1]);
                     bodies[i].MovementMode = SnakeBody.MovementModes.Shift;
                 }
+                levelPositionBodyMap[bodies[i].LevelPosition] = bodies[i];
             }
             State = States.Move;
 
@@ -1146,6 +1153,7 @@ namespace SnakeExtreme
             }
             if (State == States.Vanish && bodies.All(x => x.State == Ball.States.Invisible))
             {
+                levelPositionBodyMap.Clear();
                 State = States.Gone;
             }
         }
@@ -1392,8 +1400,8 @@ namespace SnakeExtreme
         public void LightningAppear()
         {
             State = States.LightningAppear;
-            waitCount = 7;
-            waitTotal = 8;            
+            waitCount = 3;
+            waitTotal = 4;            
             effectTotal = 30;
             shadowScale = 1;
             ballScale = 1;
@@ -1405,8 +1413,8 @@ namespace SnakeExtreme
         public void LightningVanish()
         {
             State = States.LightningVanish;
-            waitCount = 7;
-            waitTotal = 8;
+            waitCount = 3;
+            waitTotal = 4;
             effectTotal = 30;
             shadowScale = 1;
             ballScale = 1;
@@ -1906,6 +1914,7 @@ namespace SnakeExtreme
         {
             foreach (var obj in lightningObjects)
             {
+                var obstacleBodyOverlap = snake.LevelPositionBodyMap.ContainsKey(obj.obstacle.LevelPosition);
                 if (obj.turnWait == 0 && !obj.removedByShine)
                 {
                     if (obj.obstacle.State == LightningObstacle.States.Normal)
@@ -1914,7 +1923,7 @@ namespace SnakeExtreme
                         obj.turnWait = lightningActiveTurns;
                     }
                     else if (obj.obstacle.State == LightningObstacle.States.Gone &&
-                             snake.Bodies.All(x => x.LevelPosition != obj.obstacle.LevelPosition || x == snake.Tail))
+                             (!obstacleBodyOverlap || snake.Tail.LevelPosition == obj.obstacle.LevelPosition))
                     {
                         obj.obstacle.Appear();
                         obj.turnWait = lightningActiveTurns;
