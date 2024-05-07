@@ -128,12 +128,18 @@ namespace SnakeExtreme
     public class ShineEffect : IObject, ITangible
     {
         private readonly AnimatedSprite shineSprite;
+        private readonly Effect silhouetteEffect;
+        private readonly EffectParameter silhouetteOverlayColorEffectParameter;
+        private readonly static Color silhouetteColor = new Color(40, 121, 202);        
         private Vector2 velocityGravity;
         private int waitCount, waitTotal;
         private float shineAlpha = 1;
+        private float silhouetteAlpha = 0;
+        private bool silhouetteToggle;
         public static void LoadAll(ContentManager content)
         {
             content.Load<SpriteSheet>($"sprite_factory/shine_0.sf", new JsonContentLoader());
+            content.Load<Effect>("effects/silhouette_0");
         }
         public ShineEffect(ContentManager content)
         {
@@ -141,6 +147,10 @@ namespace SnakeExtreme
                 var spriteSheet = content.Load<SpriteSheet>($"sprite_factory/shine_0.sf", new JsonContentLoader());
                 shineSprite = new AnimatedSprite(spriteSheet);
                 Size = (Size)spriteSheet.TextureAtlas[0].Size;
+            }
+            {
+                silhouetteEffect = content.Load<Effect>("effects/silhouette_0");
+                silhouetteOverlayColorEffectParameter = silhouetteEffect.Parameters["OverlayColor"];
             }
             shineSprite.Play("shine_0");
         }
@@ -172,11 +182,18 @@ namespace SnakeExtreme
             else
                 shineAlpha = 1;
 
+            if (silhouetteToggle)
+                silhouetteAlpha = 0.5f;
+            else
+                silhouetteAlpha = 0;
+
             if (State == States.Vanish && waitCount == 0)
                 State = States.Gone;
 
             if (waitCount > 0)
                 waitCount--;
+
+            silhouetteToggle = !silhouetteToggle;
 
             Position += Velocity + velocityGravity;
             velocityGravity += Gravity;
@@ -187,6 +204,12 @@ namespace SnakeExtreme
             {
                 shineSprite.Alpha = Alpha * shineAlpha;
                 spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+                spriteBatch.Draw(sprite: shineSprite, position: Position, rotation: 0, scale: new Vector2(Scale));
+                spriteBatch.End();
+
+                shineSprite.Alpha = Alpha * silhouetteAlpha;
+                silhouetteOverlayColorEffectParameter.SetValue(silhouetteColor.ToVector4());
+                spriteBatch.Begin(samplerState: SamplerState.PointClamp, effect: silhouetteEffect);
                 spriteBatch.Draw(sprite: shineSprite, position: Position, rotation: 0, scale: new Vector2(Scale));
                 spriteBatch.End();
             }
@@ -1293,7 +1316,7 @@ namespace SnakeExtreme
         private readonly List<LightningEffect> lightningEffects = new();
         private readonly List<ShineEffect> shineEffects = new();
         private readonly static Color lightningSilhouetteColor = new Color(182, 229, 254);
-        private readonly static Color shineSilhouetteColor = new Color(69, 34, 196);
+        private readonly static Color shineSilhouetteColor = new Color(40, 121, 202);
         private readonly static List<Vector2> shinePossibleDirections = Enumerable
             .Range(0, 8)
             .Select(x => (x + 4) * MathHelper.TwoPi / 32)
@@ -1582,7 +1605,7 @@ namespace SnakeExtreme
             }
 
             if ((State == States.ShineAppear || State == States.ShineNormal || State == States.ShineVanish) &&
-                effectCount % 15 == 0)
+                effectCount % 10 == 0)
             {
                 var direction = shinePossibleDirections[random.Next(shinePossibleDirections.Count)];
                 var shineEffect = new ShineEffect(content)
@@ -1590,7 +1613,7 @@ namespace SnakeExtreme
                     Position = ballDrawPosition + 8 * direction,
                     Gravity = new Vector2(0, 0.25f),
                     Velocity = direction * 1.5f,
-                    Scale = 0.75f + (random.NextSingle() -0.5f) * 0.15f
+                    Scale = 0.25f + (random.NextSingle() -0.5f) * 0.25f
                 };
                 shineEffect.Vanish();
                 shineEffects.Add(shineEffect);
