@@ -337,3 +337,9 @@
 /processor:TiledMapProcessor
 /build:tiled_project/level_1.tmx
 
+#begin sounds/music_0.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:sounds/music_0.wav
+

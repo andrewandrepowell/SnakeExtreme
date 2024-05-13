@@ -401,6 +401,77 @@ namespace SnakeExtreme
             }
         }
     }
+    public class Music : IObject
+    {
+        private readonly Sound _sound;
+        private const int _totalWait = 15;
+        private int _currWait;
+        private float _nextVolume;
+        private float _prevVolume;
+        public enum States { Changing, Playing, Stopped }
+        public Music(ContentManager content, string asset)
+        {
+            _sound = new Sound(content, asset);
+        }
+        public States State { get; private set; } = States.Stopped;
+        public int Priority { get => 0; set => throw new NotImplementedException(); }
+        public float Volume
+        {
+            get => _sound.Volume; 
+            set
+            {
+                Debug.Assert(State != States.Changing);
+                _sound.Volume = value;
+            }
+        }
+        public bool Playing
+        {
+            get => _sound.Playing;
+        }
+        public void SmoothChange(float volume)
+        {
+            Debug.Assert(State == States.Playing);
+            _nextVolume = volume;
+            _prevVolume = _sound.Volume;
+            _currWait = _totalWait - 1;
+            State = States.Changing;
+        }
+        public void Play()
+        {
+            Debug.Assert(State == States.Stopped);
+            _sound.Play();
+            State = States.Playing;
+        }
+        public void Stop()
+        {
+            Debug.Assert(State == States.Playing);
+            _sound.Stop();
+            State = States.Stopped;
+        }
+        public void Draw(SpriteBatch spriteBatch)
+        {
+        }
+
+        public void StrictUpdate()
+        {
+            if (State == States.Changing)
+            {
+                float ratio = (float)_currWait / _totalWait;
+                _sound.Volume = MathHelper.SmoothStep(_nextVolume, _prevVolume, ratio);
+            }
+
+            if (State == States.Changing && _currWait == 0)
+                State = States.Playing;
+
+            if (_currWait > 0)
+                _currWait--;
+        }
+        public void Update(GameTime gameTime, MouseState mouseState, KeyboardState keyboardState, Vector2? touchState)
+        {
+            if (State == States.Playing && !_sound.Playing)
+                _sound.Play();
+        }
+    }
     public class Sound
     {
         private readonly SoundEffectInstance soundEffectInstance;
@@ -1899,7 +1970,10 @@ namespace SnakeExtreme
         private AnyKey anyKey;
         private Sound foodSound, destroySound, pauseSound, obstacleSound, moveSound;
         private Sound shineFoodAppearSound, shineFoodPickUpSound, shineFoodRemoveObstacle;
+        private Music backgroundMusic;
         private Queue<Snake.Directions> newDirections = new();
+        private const float musicMaxVolume = 0.2f;
+        private const float musicLowVolume = 0.1f;
         private const int maxNewDirections = 3;
         private float strictTimePassed;
         private const float strictTimeAmount = (float)1 / 30;
@@ -2133,7 +2207,8 @@ namespace SnakeExtreme
                        "Rafael Matos - Level Tile Assets, Sphere / Torch Assets - rafaelmatos.itch.io <n> " +
                        "Butter Milk - GUI Element Assets - butterymilk.itch.io <n> " +
                        "Julieta Ulanosvsky - Montserrat Font Asset - github.com/JulietaUla <n> " +
-                       "Joel Francis Burford - Sound Effects - joelfrancisburford.itch.io <n> "
+                       "Joel Francis Burford - Sound Effects - joelfrancisburford.itch.io <n> " +
+                       "Ansimuz - Music - ansimuz.itch.io"
             };
             board.Position = new Vector2(
                 (levelTiledMap.WidthInPixels - board.Size.Width) / 2,
@@ -2148,6 +2223,10 @@ namespace SnakeExtreme
             shineFoodPickUpSound = new Sound(Content, "sounds/shine_food_0");
             shineFoodAppearSound = new Sound(Content, "sounds/shine_food_1");
             shineFoodRemoveObstacle = new Sound(Content, "sounds/shine_food_2");
+            backgroundMusic = new Music(Content, "sounds/music_0");
+            backgroundMusic.Volume = musicLowVolume;
+            backgroundMusic.Play();
+            gameObjects.Add(backgroundMusic);
 
             snake = new Snake(Content);
             gameObjects.Add(snake);
@@ -2246,6 +2325,7 @@ namespace SnakeExtreme
                     dimmer.Dim();
                     board.Open();
                     pauseSound.Play();
+                    backgroundMusic.SmoothChange(musicLowVolume);
                     PauseState = PauseStates.Pause;
                 }
             }
@@ -2256,16 +2336,17 @@ namespace SnakeExtreme
                 {                    
                     dimmer.Brighten();
                     board.Close();
-                    pauseSound.Play();                    
+                    pauseSound.Play();
+                    backgroundMusic.SmoothChange(musicMaxVolume);
                     PauseState = PauseStates.Resume;                    
                 }
             }
 
             // Service state changes.
-            if (PauseState == PauseStates.Pause && dimmer.State == Dimmer.States.Dimmed && board.State == Board.States.Opened)
+            if (PauseState == PauseStates.Pause && dimmer.State == Dimmer.States.Dimmed && board.State == Board.States.Opened && backgroundMusic.State == Music.States.Playing)
                 PauseState = PauseStates.Paused;
 
-            if (PauseState == PauseStates.Resume && dimmer.State == Dimmer.States.None && board.State == Board.States.Closed)
+            if (PauseState == PauseStates.Resume && dimmer.State == Dimmer.States.None && board.State == Board.States.Closed && backgroundMusic.State == Music.States.Playing)
                 PauseState = PauseStates.Resumed;
 
             if (PauseState == PauseStates.Resumed && GameState == GameStates.Create && snake.State == Snake.States.Normal && food.State == Food.States.Normal)

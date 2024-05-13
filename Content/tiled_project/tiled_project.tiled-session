@@ -3,20 +3,21 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "level_0.tmx",
+    "activeFile": "level_1.tmx",
     "expandedProjectPaths": [
-        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4",
-        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor",
         ".",
-        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets"
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4",
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets",
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor"
     ],
+    "file.lastUsedOpenFilter": "All Files (*)",
     "fileStates": {
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Sample Scene.tmx": {
             "scale": 0.75,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 720.6666666666667,
-                "y": 862.6666666666666
+                "x": 403.33333333333326,
+                "y": 861.3333333333334
             }
         },
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Sample Scene2.tmx": {
@@ -26,8 +27,8 @@
             "scale": 1,
             "selectedLayer": 6,
             "viewCenter": {
-                "x": 799.5,
-                "y": 480
+                "x": 560.5,
+                "y": 479
             }
         },
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/Atlas-Props.tsx": {
@@ -94,19 +95,19 @@
             "scale": 1,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 897.5,
-                "y": 492
+                "x": 896.5,
+                "y": 491
             }
         },
         "level_1.tmx": {
             "expandedGroupLayers": [
                 2
             ],
-            "scale": 1.5,
+            "scale": 0.75,
             "selectedLayer": 1,
             "viewCenter": {
-                "x": 555,
-                "y": 714.6666666666667
+                "x": 163.33333333333331,
+                "y": 552
             }
         },
         "masks_0.tsx": {
@@ -114,7 +115,7 @@
             "scaleInEditor": 1
         },
         "tileset_terrain_0.tsx": {
-            "scaleInDock": 0.75,
+            "scaleInDock": 1.5,
             "scaleInEditor": 0.33
         }
     },
@@ -135,7 +136,8 @@
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-Platform3-no pillars.tsx",
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-wall1-4.tsx",
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-wall1-4-no transp.tsx",
-        "masks_0.tsx"
+        "masks_0.tsx",
+        "level_1.tmx"
     ],
     "project": "tiled_project.tiled-project",
     "recentFiles": [
@@ -144,13 +146,13 @@
         "tileset_terrain_0.tsx",
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/Tileset-Terrain.tsx",
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/Tileset-Terrain2.tsx",
-        "masks_0.tsx",
-        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-wall1-4-no transp.tsx",
-        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-wall1-4.tsx",
-        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-Platform3-no pillars.tsx",
-        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-Platform3.tsx",
+        "level_0.tmx",
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/Atlas-Props.tsx",
         "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/Atlas-props-sprites.tsx",
-        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/Atlas-Props.tsx"
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-Platform3.tsx",
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-Platform3-no pillars.tsx",
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-wall1-4.tsx",
+        "C:/Users/andre/Downloads/Epic RPG World - The dephs of the Mountain V1.4/TiledMap Editor/Tilesets/The depths-Tileset-wall1-4-no transp.tsx"
     ],
     "tileset.lastUsedFormat": "tsx",
     "tileset.tileSize": {
