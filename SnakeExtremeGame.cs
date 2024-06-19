@@ -1142,6 +1142,7 @@ namespace SnakeExtreme
         {
             Debug.Assert(State == States.Gone);
             bodies.Clear();
+            trueDirection = Directions.Up;
             Mode = Modes.Normal;
             State = States.Normal;
         }
@@ -2369,7 +2370,7 @@ namespace SnakeExtreme
                 var aboutToCollideWithObstacle =
                     obstacles.Any(x => x.LevelPosition == snakeNextLevelPosition) ||
                     lightningObjects.Any(x => (x.obstacle.State == LightningObstacle.States.Normal && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait != 0) ||
-                                              (x.obstacle.State == LightningObstacle.States.Gone && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait == 0));
+                                              (x.obstacle.State == LightningObstacle.States.Gone && x.obstacle.LevelPosition == snakeNextLevelPosition && x.turnWait == 0));               
 
                 // Check for game over condition.
                 if (snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX ||
@@ -2378,6 +2379,11 @@ namespace SnakeExtreme
                     (aboutToCollideWithObstacle && snake.Mode == Snake.Modes.Normal) ||
                     gameDestroy)
                 {
+                    var borderCond = snakeNextLevelPosition.X < minX || snakeNextLevelPosition.X > maxX || snakeNextLevelPosition.Y < minY || snakeNextLevelPosition.Y > maxY;
+                    var bodyCond = snake.Bodies.Any(x => x.LevelPosition == snakeNextLevelPosition && x != snake.Tail);
+                    var collideCond = (aboutToCollideWithObstacle && snake.Mode == Snake.Modes.Normal);
+                    Console.WriteLine($"borderCond={borderCond}, gameDestroy={gameDestroy}, bodyCond={bodyCond}, collideCond={collideCond}");
+
                     gameDestroy = false;
 
                     snake.Vanish();
